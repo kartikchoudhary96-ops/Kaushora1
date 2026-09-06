@@ -10,7 +10,8 @@ SCHEMA = BASE / "database" / "schema.sql"
 def main():
     DB.parent.mkdir(parents=True, exist_ok=True)
     if DB.exists():
-        DB.unlink()
+        print(f"DB already exists at {DB}")
+        return
     conn = sqlite3.connect(DB)
     conn.executescript(SCHEMA.read_text(encoding="utf-8"))
     conn.execute(
