@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Course Alignment — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="courses">
+  <div id="shell"></div>
+  <script src="js/vendor/chart.umd.min.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      const id = new URLSearchParams(window.location.search).get("id") || "";
+
+      async function load() {
+        page.innerHTML = '<a href="courses.html" class="btn ghost sm">← All courses</a><div class="card" style="margin-top:14px"><div class="skel" style="height:300px"></div></div>';
+        if (!id) { page.innerHTML = window.KShell.emptyState("No course selected", "Choose a course from the Courses page."); return; }
+        try {
+          const a = await window.KaushoraAPI.courseAlignment(id);
+          render(a);
+        } catch (e) {
+          page.innerHTML = '<a href="courses.html" class="btn ghost sm">← All courses</a><div style="margin-top:14px">' +
+            (e.status === 404 ? window.KShell.emptyState("Course not found", "No course with id “" + esc(id) + "” exists.") : window.KShell.errorState(e.message, "reload")) + "</div>";
+          window.reload = () => load();
+        }
+      }
+
+      function render(a) {
+        const c = a.course;
+        document.title = c.course_name + " — Kaushora Course Alignment";
+        let h = '<a href="courses.html" class="btn ghost sm">← All courses</a>' +
+          '<div class="eyebrow" style="margin-top:14px">' + esc(c.sector || "") + " · " + esc(c.qualification_level || "") + " · " + esc(c.duration || "") + "</div>" +
+          "<h1 class='title'>" + esc(c.course_name) + "</h1>" +
+          '<p class="subtitle">' + esc(c.provider || "") + " · " + esc(c.delivery_mode || "") + " · Targets: " + esc(c.target_roles || "—") + "</p>";
+
+        if (a.alignment_score == null) {
+          h += '<div class="empty">' + window.KIcon("doc") + "<h3>Alignment cannot be assessed</h3><p>" + esc(a.methodology) +
+            ". Stated target roles (" + esc((a.unmapped_role_phrases || []).join(", ")) + ") are absent from the " +
+            "4-row NCO role catalog, so scoring would fabricate a signal. The curriculum record itself remains inspectable on the Courses page.</p></div>";
+          page.innerHTML = h;
+          return;
+        }
+
+        h += '<div class="grid cols-3">' +
+          '<div class="card kpi"><div class="k-label">Coverage score</div><div class="k-value">' + a.alignment_score + '%</div><div class="k-sub">' + a.matched + " of " + a.industry_skill_count + " required skills covered</div></div>" +
+          '<div class="card kpi"><div class="k-label">Recommended action</div><div class="k-value" style="font-size:22px;padding:6px 0">' + esc(a.recommended_action) + '</div><div class="k-sub">Missing: ' + a.missing_count + " · Partial: " + a.partial_skills.length + "</div></div>" +
+          '<div class="card"><div class="eyebrow">Coverage mix</div><div class="chart-box sm"><canvas id="chCov"></canvas></div></div></div>';
+
+        h += '<div class="grid cols-2" style="margin-top:16px"><div class="card"><h3>Covered adequately (' + a.adequate_skills.length + ')</h3>' + skillList(a.adequate_skills, "Covered") + "</div>" +
+          '<div class="card"><h3>Partial gaps — proficiency (' + a.partial_skills.length + ')</h3>' + skillList(a.partial_skills, "Partial gap") + "</div></div>";
+        h += '<div class="card" style="margin-top:16px"><h3>Missing skills (' + a.missing_skills.length + ')</h3>' + skillList(a.missing_skills, "Major gap") + "</div>";
+
+        const recs = (a.recommended_additions || []).concat(a.recommended_updates || []);
+        h += '<div class="card" style="margin-top:16px"><h3>Recommended ADD / UPDATE actions</h3>' +
+          (recs.length ? "<ul style='margin:8px 0 0;padding-left:20px'>" + recs.map((r) => "<li style='margin:6px 0'>" + esc(r) + "</li>").join("") + "</ul>"
+            : '<p class="hint">No additions required by the current evidence.</p>') + "</div>";
+
+        h += '<div class="card" style="margin-top:16px"><h3>Match basis &amp; honesty log</h3>' +
+          '<p class="hint">Matched roles: <b>' + esc((a.matched_roles || []).join(", ") || "—") + "</b></p>" +
+          '<p class="hint">Unmapped requirement phrases (reported, never forced): <b>' + esc((a.unmapped_requirement_phrases || []).join(", ") || "none") + "</b></p>" +
+          '<p class="hint">Unmapped target phrases: <b>' + esc((a.unmapped_role_phrases || []).join(", ") || "none") + "</b></p>" +
+          '<p class="hint">' + esc(a.methodology) + " · Source: " + esc((a.evidence || {}).source || "") + "</p></div>";
+
+        page.innerHTML = h;
+        if (typeof Chart !== "undefined") {
+          new Chart(document.getElementById("chCov"), {
+            type: "doughnut",
+            data: { labels: ["Adequate", "Partial", "Missing"], datasets: [{ data: [a.adequate_skills.length, a.partial_skills.length, a.missing_skills.length], backgroundColor: ["#4c7a35", "#e8b44f", "#cf5f52"], borderColor: "#fff", borderWidth: 3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } }
+          });
+        }
+      }
+
+      function skillList(items, label) {
+        if (!items.length) return '<p class="hint">None — no ' + esc(label.toLowerCase()) + " skills in this band.</p>";
+        let h = '<div class="table-wrap"><table class="data" style="min-width:0"><thead><tr><th>Skill</th><th>Industry expects</th><th>Curriculum gives</th><th>Gap</th></tr></thead><tbody>';
+        items.forEach(function (m) {
+          const cls = m.gap === "Covered" ? "tag-green" : m.gap === "Partial gap" ? "tag-amber" : "tag-red";
+          h += "<tr><td><a href='skill-detail.html?id=" + encodeURIComponent(m.skill_id) + "'><b>" + esc(m.skill_name) + "</b></a></td>" +
+            "<td>" + esc(m.industry_proficiency || "—") + "</td><td>" + esc(m.curriculum_proficiency || "—") + "</td>" +
+            '<td><span class="pill ' + cls + '">' + esc(m.gap) + "</span></td></tr>";
+        });
+        return h + "</tbody></table></div>";
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

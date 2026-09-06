@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" role="img" aria-label="Kaushora Labour Intelligence">
+  <g>
+    <path d="M6 46 L26 26 L46 46" fill="none" stroke="#B7D88A" stroke-width="8"/>
+    <path d="M14.5 39 L26 27.5 L37.5 39" fill="none" stroke="#151515" stroke-width="5"/>
+    <rect x="23.2" y="49" width="5.6" height="5.6" fill="#151515"/>
+  </g>
+  <text x="58" y="35" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="26" letter-spacing="-0.5" fill="#151515">Kaushora</text>
+  <text x="59" y="51" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="10.5" letter-spacing="3.1" fill="#5b6257">LABOUR INTELLIGENCE</text>
+</svg>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skill Intelligence — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="skills">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      let all = [], sectors = [];
+
+      function statusPill(s) {
+        return s === "Insufficient Evidence" ? '<span class="pill tag-grey">Insufficient Evidence</span>' : '<span class="pill tag-green">' + esc(s) + "</span>";
+      }
+
+      async function load() {
+        page.innerHTML =
+          '<div class="eyebrow">Ontology &amp; Intelligence · Updated live</div>' +
+          '<h1 class="title">Skill Intelligence</h1>' +
+          '<p class="subtitle">Live labour-market demand signals, cross-role versatility and curriculum alignment across catalogued skills.</p>' +
+          '<div class="card"><div class="skel" style="height:120px"></div></div>' +
+          '<div class="card" style="margin-top:16px"><div class="skel" style="height:300px"></div></div>';
+        try {
+          const [skills, sec] = await Promise.all([window.KaushoraAPI.skills(), window.KaushoraAPI.sectors()]);
+          all = skills; sectors = sec;
+          renderShell(); applyFilters();
+        } catch (e) {
+          page.innerHTML = window.KShell.errorState(e.message, "reload");
+          window.reload = () => load();
+        }
+      }
+
+      function renderShell() {
+        const statuses = [...new Set(all.map((s) => s.demand_status))];
+        page.innerHTML =
+          '<div class="eyebrow">Ontology &amp; Intelligence · ' + all.length + ' skills live</div>' +
+          '<h1 class="title">Skill Intelligence</h1>' +
+          '<p class="subtitle">Live labour-market demand signals, cross-role versatility and curriculum alignment across catalogued skills.</p>' +
+          '<div class="card"><div class="grid cols-3" style="align-items:end">' +
+          '<div class="field" style="margin:0"><label for="q">Search skills</label><div class="searchbar">' + window.KIcon("search") +
+          '<input id="q" type="search" placeholder="e.g. Programming, Patient Care…" aria-label="Search skills" /></div></div>' +
+          '<div class="field" style="margin:0"><label for="fSector">Economic sector</label><select id="fSector" class="inline-filter" style="width:100%;padding:10px 13px">' +
+          '<option value="">All sectors</option>' + sectors.map((s) => '<option value="' + esc(s.sector_name) + '">' + esc(s.sector_name) + "</option>").join("") + "</select></div>" +
+          '<div class="field" style="margin:0"><label for="fStatus">Demand status</label><select id="fStatus" class="inline-filter" style="width:100%;padding:10px 13px">' +
+          '<option value="">All statuses</option>' + statuses.map((s) => '<option>' + esc(s) + "</option>").join("") + "</select></div>" +
+          '</div><p class="hint" style="margin:10px 0 0">Demand scores use deterministic synthetic job-posting and employer-survey records. Status filters reflect live backend values only.</p></div>' +
+          '<h2 class="section">Priority Skill Profiles</h2>' +
+          '<p class="section-sub" id="countLine"></p><div id="tbl"></div>' +
+          '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Methodology.</b> Demo demand score = 60% normalized job-posting frequency + 40% normalized employer hiring demand. Both inputs are deterministic synthetic demo data and are marked <code>is_synthetic=1</code>.</div></div>";
+        document.getElementById("q").addEventListener("input", applyFilters);
+        document.getElementById("fSector").addEventListener("change", applyFilters);
+        document.getElementById("fStatus").addEventListener("change", applyFilters);
+      }
+
+      function applyFilters() {
+        const q = (document.getElementById("q").value || "").toLowerCase();
+        const sec = document.getElementById("fSector").value;
+        const st = document.getElementById("fStatus").value;
+        const rows = all.filter((s) =>
+          (!q || s.skill_name.toLowerCase().includes(q)) &&
+          (!sec || (s.sector || "") === sec) &&
+          (!st || s.demand_status === st));
+        document.getElementById("countLine").textContent = "Showing " + rows.length + " of " + all.length + " catalogued skills";
+        if (!rows.length) {
+          document.getElementById("tbl").innerHTML = window.KShell.emptyState("No records available for this filter", "Try clearing the search or choosing a different sector.");
+          return;
+        }
+        let h = '<div class="table-wrap"><table class="data"><thead><tr><th>Skill</th><th>Sector</th><th>Related roles</th><th>Taught by</th><th>Demand status</th><th></th></tr></thead><tbody>';
+        rows.forEach(function (s) {
+          h += "<tr><td><b>" + esc(s.skill_name) + "</b><br><span style='color:var(--muted);font-size:12px'>" + esc(s.category || "") + " · " + esc(s.normalized_skill_name || "") + "</span></td>" +
+            "<td>" + esc(s.sector || "—") + "</td>" +
+            "<td><b>" + (s.related_roles || []).length + "</b> role(s)</td>" +
+            "<td>" + ((s.taught_by_courses || []).length ? esc(s.taught_by_courses.join(", ")) : "—") + "</td>" +
+            "<td>" + statusPill(s.demand_status) + "</td>" +
+            '<td><a class="btn ghost sm" href="skill-detail.html?id=' + encodeURIComponent(s.id) + '">Evidence dossier</a></td></tr>';
+        });
+        document.getElementById("tbl").innerHTML = h + "</tbody></table></div>";
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

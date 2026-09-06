@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="login">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      function load() {
+        page.innerHTML =
+          '<div class="eyebrow">Prototype authentication</div><h1 class="title">Login</h1>' +
+          '<p class="subtitle">Session-based demo auth backed by the real backend (<code>/api/auth/*</code>). Hackathon-grade only — not production security. Credentials are verified server-side; none are embedded in this page.</p>' +
+          '<div class="grid cols-2"><div class="card"><h3>Sign in</h3><form id="f">' +
+          '<div class="field"><label for="email">Email</label><input id="email" type="email" required autocomplete="username" placeholder="demo@kaushora.in" /></div>' +
+          '<div class="field"><label for="pw">Password</label><input id="pw" type="password" required autocomplete="current-password" placeholder="••••••" /></div>' +
+          '<button class="btn" type="submit" id="go">Login</button> <span id="msg" style="font-size:13.5px"></span></form>' +
+          '<p class="hint">Demo accounts: <b>demo@kaushora.in</b> / <b>employer@demo.in</b> (password in project README, verified by the server).</p></div>' +
+          '<div class="card"><h3>Session</h3><div id="sess"><div class="skel" style="height:90px"></div></div>' +
+          '<div style="margin-top:12px"><button class="btn ghost sm" id="out">Logout</button></div></div></div>';
+        document.getElementById("f").addEventListener("submit", login);
+        document.getElementById("out").addEventListener("click", async () => {
+          await window.KaushoraAPI.logout(); refresh();
+          document.getElementById("msg").textContent = "Logged out.";
+        });
+        refresh();
+      }
+      async function login(e) {
+        e.preventDefault();
+        const btn = document.getElementById("go"), msg = document.getElementById("msg");
+        btn.disabled = true; btn.textContent = "Signing in…"; msg.textContent = "";
+        try {
+          const r = await window.KaushoraAPI.login(
+            document.getElementById("email").value.trim(), document.getElementById("pw").value);
+          msg.innerHTML = "<b style='color:var(--pistachio-deep)'>Logged in as " + esc(r.user.email) + " (" + esc(r.user.role) + ").</b>";
+          refresh();
+        } catch (err) { msg.innerHTML = "<b style='color:var(--red)'>" + esc(err.message) + "</b>"; }
+        finally { btn.disabled = false; btn.textContent = "Login"; }
+      }
+      async function refresh() {
+        const el = document.getElementById("sess");
+        const me = await window.KaushoraAPI.me();
+        el.innerHTML = me && me.user
+          ? '<p><b>' + esc(me.user.email) + "</b></p><p class='hint'>Role: " + esc(me.user.role || "viewer") + " · session active on the backend.</p>"
+          : '<p class="hint">No active session — you are browsing as a guest.</p>';
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

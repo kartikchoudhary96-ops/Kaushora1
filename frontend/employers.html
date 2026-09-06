@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Employer Validation — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="employers">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+
+      function load() {
+        page.innerHTML =
+          '<div class="eyebrow">Employer validation</div><h1 class="title">Employers</h1>' +
+          '<p class="subtitle">Tell training institutions which competencies matter. Submissions are stored as observed user evidence — strictly separated from the source dataset — and mapped to catalogued skills where possible.</p>' +
+          '<div class="grid cols-2"><div class="card"><div class="eyebrow">Requirement survey</div><h3>Submit a skill requirement</h3>' +
+          '<form id="f">' +
+          '<div class="field"><label for="ename">Organisation name *</label><input id="ename" required maxlength="120" placeholder="e.g. Acme Health Services" /></div>' +
+          '<div class="grid cols-2">' +
+          '<div class="field"><label for="role">Job role *</label><input id="role" required maxlength="120" placeholder="e.g. Software Tester" /></div>' +
+          '<div class="field"><label for="skill">Skill needed *</label><input id="skill" required maxlength="120" placeholder="e.g. Software Testing" /></div></div>' +
+          '<div class="grid cols-3">' +
+          '<div class="field"><label for="imp">Importance (1–5)</label><select id="imp"><option>5</option><option>4</option><option selected>3</option><option>2</option><option>1</option></select></div>' +
+          '<div class="field"><label for="prof">Required proficiency</label><select id="prof"><option>Basic</option><option selected>Intermediate</option><option>Advanced</option><option>Expert</option></select></div>' +
+          '<div class="field"><label for="dem">Hiring demand</label><input id="dem" type="number" min="0" value="1" /></div></div>' +
+          '<div class="grid cols-3">' +
+          '<div class="field"><label for="ind">Industry</label><input id="ind" maxlength="80" placeholder="Optional" /></div>' +
+          '<div class="field"><label for="dist">District</label><input id="dist" maxlength="80" placeholder="Optional" /></div>' +
+          '<div class="field"><label for="diff">Hiring difficulty</label><select id="diff"><option>Easy</option><option selected>Medium</option><option>Hard</option></select></div></div>' +
+          '<button class="btn" type="submit" id="go">Submit requirement</button> <span id="msg" style="font-size:13.5px"></span></form></div>' +
+          '<div class="card"><div class="eyebrow">Employer evidence</div><h3>Demo + community submissions</h3><p class="hint">Demo rows are synthetic; your new submissions are stored as observed evidence and remain distinguishable.</p><div id="subs"><div class="skel" style="height:180px"></div></div></div></div>';
+        document.getElementById("f").addEventListener("submit", submit);
+        refreshSubs();
+      }
+
+      async function submit(ev) {
+        ev.preventDefault();
+        const btn = document.getElementById("go"), msg = document.getElementById("msg");
+        const payload = {
+          employer_name: document.getElementById("ename").value.trim(),
+          job_role: document.getElementById("role").value.trim(),
+          skill: document.getElementById("skill").value.trim(),
+          importance: parseInt(document.getElementById("imp").value, 10),
+          required_proficiency: document.getElementById("prof").value,
+          hiring_demand: parseInt(document.getElementById("dem").value, 10) || 0,
+          industry: document.getElementById("ind").value.trim(),
+          district: document.getElementById("dist").value.trim(),
+          difficulty: document.getElementById("diff").value
+        };
+        btn.disabled = true; btn.textContent = "Submitting…"; msg.textContent = "";
+        try {
+          const r = await window.KaushoraAPI.employerSurvey(payload);
+          msg.innerHTML = "<b style='color:var(--pistachio-deep)'>Saved (record #" + r.id + ").</b> " +
+            (r.skill_id ? "Mapped to catalogued skill <b>" + esc(r.skill_id) + "</b>." : "Skill is new to the catalog — kept as free text, never force-mapped.");
+          document.getElementById("f").reset();
+          refreshSubs();
+        } catch (e) {
+          msg.innerHTML = "<b style='color:var(--red)'>" + esc(e.message) + "</b>";
+        } finally { btn.disabled = false; btn.textContent = "Submit requirement"; }
+      }
+
+      async function refreshSubs() {
+        const el = document.getElementById("subs");
+        try {
+          const r = await window.KaushoraAPI.employerRequirements();
+          const rows = r.data || [];
+          el.innerHTML = rows.length
+            ? '<div class="table-wrap"><table class="data" style="min-width:0"><thead><tr><th>Organisation</th><th>Role</th><th>Skill</th><th>Imp.</th></tr></thead><tbody>' +
+              rows.slice(0, 12).map((x) => "<tr><td><b>" + esc(x.employer_name) + "</b></td><td>" + esc(x.job_role) + "</td><td>" + esc(x.skill_name) + (x.skill_id ? ' <span class="pill tag-green">' + esc(x.skill_id) + "</span>" : "") + "</td><td>" + x.importance + "/5</td></tr>").join("") + "</tbody></table></div>"
+            : window.KShell.emptyState("No submissions yet", "Be the first to contribute observed employer evidence.");
+        } catch (e) { el.innerHTML = window.KShell.errorState(e.message); }
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — Kaushora Labour Market Intelligence</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="dashboard">
+  <div id="shell"></div>
+  <script src="js/vendor/chart.umd.min.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      const PAL = ["#4c7a35", "#b7d88a", "#151515", "#e8b44f", "#5b8fc4", "#cf5f52", "#8a9a5b", "#c9b896", "#6f7468"];
+      let charts = [];
+
+      function kpi(label, value, sub, tag, tagCls) {
+        return '<div class="card kpi"><div class="k-label">' + label + '</div><div class="k-value">' + value +
+          '</div><div class="k-sub">' + sub + '</div>' + (tag ? '<span class="k-tag ' + tagCls + '">' + tag + "</span>" : "") + "</div>";
+      }
+
+      async function load() {
+        page.innerHTML =
+          '<div class="eyebrow">Overview · Updated live from the backend</div>' +
+          '<h1 class="title">Labour Market Intelligence</h1>' +
+          '<p class="subtitle">Understand demand, identify gaps and turn evidence into action across institutional curricula.</p>' +
+          window.KShell.skeletonCards(5) + '<div class="card" style="margin-top:16px"><div class="skel" style="height:220px"></div></div>';
+        try {
+          const [ov, courses, croles, trends, ds] = await Promise.all([
+            window.KaushoraAPI.overview(), window.KaushoraAPI.courses(),
+            window.KaushoraAPI.careerRoles(), window.KaushoraAPI.trends(), window.KaushoraAPI.dataStatus()
+          ]);
+          render(ov, courses, croles, trends, ds);
+        } catch (e) {
+          page.innerHTML = window.KShell.errorState(e.message, "reload");
+          window.reload = () => load();
+        }
+      }
+
+      function render(ov, courses, croles, trends, ds) {
+        const t = ov.totals;
+        const alignTxt = t.avg_alignment == null ? "—" : t.avg_alignment + "%";
+        let h = '<div class="eyebrow">Overview · ' + esc(ds.last_ingestion ? ds.last_ingestion.started_at.slice(0, 10) : "live") + "</div>" +
+          '<h1 class="title">Labour Market Intelligence</h1>' +
+          '<p class="subtitle">Understand demand, identify gaps and turn evidence into action across institutional curricula.</p>' +
+          '<div class="grid kpis">' +
+          kpi("Skills tracked", t.unique_skills, "Across catalogued sectors", "Real catalog", "tag-green") +
+          kpi("Training courses", t.courses, "NSQF Qualification Packs", "Active QPs", "tag-green") +
+          kpi("Job roles", t.roles, "NCO 2015 classification", "Official classes", "tag-green") +
+          kpi("Trend signals", t.trends, "WEF qualitative evidence", "Sector-level", "tag-blue") +
+          kpi("Avg. alignment", alignTxt, "Assessable course coverage", t.avg_alignment == null ? "Cannot assess" : "Coverage-based", t.avg_alignment == null ? "tag-grey" : "tag-green") +
+          "</div>";
+
+        h += '<div class="evidence-strip" style="margin:16px 0 0">' + window.KIcon("db") +
+          "<div><b>Demand records analysed: " + t.jobs_analysed + ".</b> These are deterministic synthetic demo job postings, combined with labelled synthetic employer surveys to make demand scoring interactive. The skills, roles, courses and trends remain real-source catalog records.</div></div>";
+
+        h += '<div class="grid cols-23" style="margin-top:16px">' +
+          '<div class="card"><div class="eyebrow">Signature · Skill × Role coverage</div><h3>Skill Demand Landscape</h3>' +
+          '<p class="hint">Which catalogued skills do NCO roles require, and which courses teach them? Green = required &amp; taught · red = required but untaught · grey = taught, no mapped requirement. Select a row for detail.</p>' +
+          '<div id="matrix"></div></div>' +
+          '<div class="card"><div class="eyebrow">Priority alignment signals</div><h3>Actions</h3><p class="hint">From live course alignment + trend evidence.</p><div id="actions"></div></div></div>';
+
+        h += '<div class="grid cols-2" style="margin-top:16px">' +
+          '<div class="card"><div class="eyebrow">Catalog composition</div><h3>Skills by sector</h3><p class="hint">Live counts from the skills catalog.</p><div class="chart-box sm"><canvas id="chSector"></canvas></div></div>' +
+          '<div class="card"><div class="eyebrow">Training footprint</div><h3>Skills taught per course</h3><p class="hint">Counts from live course records (QP curricula).</p><div class="chart-box sm"><canvas id="chCourse"></canvas></div></div></div>';
+
+        h += '<h2 class="section">Where Training May Not Match Demand</h2>' +
+          '<p class="section-sub">Live course alignment against NCO role requirements.</p><div id="mismatch"></div>';
+
+        h += '<div class="grid cols-23" style="margin-top:16px">' +
+          '<div><h2 class="section" style="margin-top:0">Priority Competencies Registry</h2>' +
+          '<p class="section-sub">Catalogued skills ranked by cross-role versatility (live role-mapping count — not a demand index).</p><div id="registry"></div></div>' +
+          '<div><h2 class="section" style="margin-top:0">Regional Disparity Index</h2>' +
+          '<p class="section-sub">District demand concentration vs training seats.</p>' +
+          '<div class="card" style="text-align:center"><img src="assets/district-map.png" alt="Maharashtra district demo map" style="width:100%;max-width:300px;height:auto" onerror="this.onerror=null;this.src=\'assets/district-map.svg\'" />' +
+          '<p class="hint" style="margin-top:10px">' + t.districts + ' Maharashtra demo districts with a total capacity gap of <b>' + (t.capacity_gap == null ? "—" : t.capacity_gap) + '</b>. Records are synthetic and marked accordingly.</p>' +
+          '<a class="btn ghost sm" href="districts.html">Open district intelligence</a></div></div></div>';
+
+        h += '<h2 class="section">Emerging signals (qualitative)</h2>' +
+          '<p class="section-sub">WEF Future of Jobs evidence — sector-level direction, not skill-level measurement.</p>' +
+          '<div class="grid cols-3" id="trendCards"></div>';
+
+        h += '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Data freshness &amp; scope.</b> " +
+          "Last ingestion: " + esc(ds.last_ingestion ? ds.last_ingestion.started_at : "unknown") +
+          " · Periods: " + esc((ds.periods || []).join("; ")) + " · Scope: " + esc(ds.geographic_scope || "national") + ".</div></div>";
+
+        page.innerHTML = h;
+        renderMatrix(croles, courses);
+        renderActions(ov.actions || []);
+        renderSectorChart(courses);
+        renderCourseChart(courses);
+        renderMismatch(courses);
+        renderRegistry(ov.top_skills || []);
+        renderTrends(trends.trend_signals || []);
+      }
+
+      function renderMatrix(croles, courses) {
+        // skill -> {requiredBy:Set, taughtBy:Set, name, sector}
+        const req = {};
+        croles.forEach(function (r) { (r.required_skills || []).forEach(function (s) { (req[s] = req[s] || new Set()).add(r.role_id); }); });
+        window.KaushoraAPI.skills().then(function (skills) {
+          const byId = {};
+          skills.forEach(function (s) { byId[s.id] = s; });
+          const taught = {};
+          courses.forEach(function (c) {
+            (c.skills_taught || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean)
+              .forEach(function (s) { (taught[s] = taught[s] || new Set()).add(c.id); });
+          });
+          const roleIds = croles.map(function (r) { return r.role_id; });
+          let h = '<div class="table-wrap"><table class="data" style="min-width:560px"><thead><tr><th>Skill</th>' +
+            roleIds.map(function (r) { return "<th>" + esc(r.replace("NCO-", "")) + "</th>"; }).join("") + "<th>Taught by</th></tr></thead><tbody>";
+          skills.slice().sort(function (a, b) { return a.skill_name.localeCompare(b.skill_name); }).forEach(function (s) {
+            h += '<tr class="clickable" data-skill="' + s.id + '"><td><b>' + esc(s.skill_name) + '</b><br><span style="color:var(--muted);font-size:12px">' + esc(s.sector || "") + "</span></td>";
+            roleIds.forEach(function (r) {
+              const need = req[s.id] && req[s.id].has(r);
+              const got = taught[s.id] && taught[s.id].size > 0;
+              const col = !need && !got ? "#f1ecdd" : need && got ? "#4c7a35" : need ? "#cf5f52" : "#b9bfae";
+              h += '<td><span title="' + (need ? "Required" : "Not required") + (got ? " · taught" : "") +
+                '" style="display:inline-block;width:16px;height:16px;border-radius:5px;background:' + col + '"></span></td>';
+            });
+            h += "<td>" + ((taught[s.id] || new Set()).size || "—") + " course(s)</td></tr>";
+          });
+          document.getElementById("matrix").innerHTML = h + "</tbody></table></div>";
+          document.querySelectorAll("#matrix tr.clickable").forEach(function (tr) {
+            tr.addEventListener("click", () => (window.location.href = "skill-detail.html?id=" + encodeURIComponent(tr.dataset.skill)));
+          });
+        }).catch(function (e) {
+          document.getElementById("matrix").innerHTML = window.KShell.errorState(e.message);
+        });
+      }
+
+      function renderActions(actions) {
+        if (!actions.length) {
+          document.getElementById("actions").innerHTML = window.KShell.emptyState("No actions", "No alignment signals in the current dataset.");
+          return;
+        }
+        document.getElementById("actions").innerHTML = actions.slice(0, 6).map(function (a) {
+          const cls = a.priority === "High" ? "tag-red" : a.type === "trend" ? "tag-blue" : "tag-amber";
+          return '<div style="padding:10px 0;border-bottom:1px solid var(--line-soft)"><span class="pill ' + cls + '">' +
+            esc(a.priority || a.type) + '</span><div style="font-weight:700;margin-top:6px">' + esc(a.title) + '</div>' +
+            '<div style="font-size:13px;color:var(--muted)">' + esc(a.reason || "") + "</div></div>";
+        }).join("");
+      }
+
+      function renderSectorChart(courses) {
+        window.KaushoraAPI.skills().then(function (skills) {
+          const counts = {};
+          skills.forEach(function (s) { counts[s.sector || "Other"] = (counts[s.sector || "Other"] || 0) + 1; });
+          drawChart("chSector", {
+            type: "doughnut",
+            data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: PAL, borderColor: "#fff", borderWidth: 3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } }
+          });
+        });
+      }
+
+      function renderCourseChart(courses) {
+        const labels = courses.map(function (c) { return c.course_name; });
+        const counts = courses.map(function (c) {
+          return (c.skills_taught || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean).length;
+        });
+        drawChart("chCourse", {
+          type: "bar",
+          data: { labels, datasets: [{ label: "Skills taught", data: counts, backgroundColor: PAL.slice(0, labels.length), borderRadius: 8 }] },
+          options: {
+            indexAxis: "y", responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { ticks: { precision: 0 }, title: { display: true, text: "skills in curriculum" } } },
+            onClick: (e, els) => { if (els.length) window.location.href = "course-detail.html?id=" + encodeURIComponent(courses[els[0].index].id); }
+          }
+        });
+      }
+
+      async function renderMismatch(courses) {
+        const rows = [];
+        for (const c of courses) {
+          try {
+            const a = await window.KaushoraAPI.courseAlignment(c.id);
+            rows.push({ c, a });
+          } catch (e) { rows.push({ c, a: null }); }
+        }
+        let h = '<div class="table-wrap"><table class="data"><thead><tr><th>Course</th><th>Coverage</th><th>Status</th><th>Recommended action</th><th></th></tr></thead><tbody>';
+        rows.forEach(function (r) {
+          const score = r.a && r.a.alignment_score;
+          const status = score == null
+            ? '<span class="pill tag-grey">Insufficient data</span>'
+            : score >= 80 ? '<span class="pill tag-green">Aligned</span>'
+            : score >= 65 ? '<span class="pill tag-amber">Partial gap</span>' : '<span class="pill tag-red">Major gap</span>';
+          h += "<tr><td><b>" + esc(r.c.course_name) + "</b><br><span style='color:var(--muted);font-size:12px'>" + esc(r.c.sector || "") + "</span></td>" +
+            "<td><b>" + (score == null ? "—" : score + "%") + "</b></td><td>" + status + "</td>" +
+            "<td>" + esc((r.a && r.a.recommended_action) || "Cannot assess") + "</td>" +
+            '<td><a class="btn ghost sm" href="course-detail.html?id=' + encodeURIComponent(r.c.id) + '">Analyze</a></td></tr>';
+        });
+        document.getElementById("mismatch").innerHTML = h + "</tbody></table></div>";
+      }
+
+      function renderRegistry(topSkills) {
+        const rows = topSkills.slice().sort(function (a, b) { return (b.related_roles || []).length - (a.related_roles || []).length; });
+        let h = '<div class="table-wrap"><table class="data" style="min-width:520px"><thead><tr><th>Skill</th><th>Cross-role versatility</th><th>Sector</th><th>Audit grounding</th><th></th></tr></thead><tbody>';
+        rows.forEach(function (s) {
+          h += "<tr><td><b>" + esc(s.skill_name) + "</b></td>" +
+            "<td><b>" + (s.related_roles || []).length + "</b> role(s)</td>" +
+            "<td>" + esc(s.sector || "—") + "</td>" +
+            '<td><span class="pill ' + (s.demand_status === "Critical Demand" || s.demand_status === "High Demand" ? "tag-red" : "tag-amber") + '">' + esc(s.demand_status) + '</span></td>' +
+            '<td><a class="btn ghost sm" href="skill-detail.html?id=' + encodeURIComponent(s.id) + '">Dossier</a></td></tr>';
+        });
+        document.getElementById("registry").innerHTML = h + "</tbody></table></div>";
+      }
+
+      function renderTrends(signals) {
+        document.getElementById("trendCards").innerHTML = signals.map(function (t, i) {
+          const dir = (t.trend_direction || "").toLowerCase() === "growing" ? "tag-green" : "tag-grey";
+          return '<div class="card"><span class="pill ' + dir + '">' + esc(t.trend_direction || "—") + "</span>" +
+            "<h3 style='margin-top:8px'>" + esc(t.technology) + "</h3>" +
+            '<p class="hint">' + esc(t.evidence || t.trend_description || "") + "</p>" +
+            '<div style="font-size:12px;color:var(--muted)">' + esc(t.source || "") + " · " + esc(t.period || "") + "</div></div>";
+        }).join("");
+      }
+
+      function drawChart(id, cfg) {
+        const el = document.getElementById(id);
+        if (!el || typeof Chart === "undefined") return;
+        charts.push(new Chart(el, cfg));
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

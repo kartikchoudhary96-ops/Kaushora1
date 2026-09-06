@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Career Guidance — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="careers">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+
+      async function load() {
+        page.innerHTML =
+          '<div class="eyebrow">Candidate career guidance</div><h1 class="title">Careers</h1>' +
+          '<p class="subtitle">Deterministic skill-to-role matching against NCO roles and QP curricula. No job listings are invented — only catalogued roles, skills and courses.</p>' +
+          '<div class="grid cols-32"><div class="card"><div class="eyebrow">Your profile</div><h3>What can you do today?</h3>' +
+          '<form id="f"><div class="field"><label for="skills">Current skills (comma separated)</label>' +
+          '<input id="skills" name="skills" placeholder="e.g. Python, SQL, documentation" autocomplete="off" />' +
+          '<span class="f-hint">Matched by name against the 9-skill catalog; unknown phrases are ignored, never forced.</span></div>' +
+          '<div class="field"><label for="sector">Target sector (optional)</label><select id="sector" name="sector"><option value="">All sectors</option></select></div>' +
+          '<button class="btn" type="submit" id="go">Analyze my fit</button></form></div>' +
+          '<div class="card"><div class="eyebrow">How scoring works</div><h3>Candidate skill match</h3>' +
+          '<p class="hint">match = your mapped skills ∩ role requirements ÷ role requirements × 100. Roles with no mappable requirements are listed as unscored, not zeroed.</p>' +
+          '<div class="flow" style="grid-template-columns:1fr 1fr"><div class="flow-step"><span class="n">IN</span><b>Current skills</b><span>your mapped catalog skills</span></div>' +
+          '<div class="flow-step dark"><span class="n">OUT</span><b>Pathway</b><span>missing skills + courses that teach them</span></div></div></div></div>' +
+          '<div id="out" style="margin-top:16px"></div>';
+        try {
+          const sectors = await window.KaushoraAPI.sectors();
+          document.getElementById("sector").innerHTML = '<option value="">All sectors</option>' +
+            sectors.map((s) => "<option>" + esc(s.sector_name) + "</option>").join("");
+        } catch (e) { /* sector filter optional */ }
+        document.getElementById("f").addEventListener("submit", analyze);
+      }
+
+      async function analyze(ev) {
+        ev.preventDefault();
+        const out = document.getElementById("out"), btn = document.getElementById("go");
+        const skills = document.getElementById("skills").value;
+        const sector = document.getElementById("sector").value;
+        btn.disabled = true; btn.textContent = "Analyzing…";
+        out.innerHTML = '<div class="grid cols-2"><div class="card"><div class="skel" style="height:160px"></div></div><div class="card"><div class="skel" style="height:160px"></div></div></div>';
+        try {
+          const r = await window.KaushoraAPI.analyzeCareer({ current_skills: skills, target_sector: sector });
+          render(r);
+        } catch (e) {
+          out.innerHTML = window.KShell.errorState(e.message, null);
+        } finally { btn.disabled = false; btn.textContent = "Analyze my fit"; }
+      }
+
+      function render(r) {
+        let h = "";
+        if (!r.recommended_roles.length) {
+          h += window.KShell.emptyState("No scorable roles", "None of the catalogued roles map to the current skill catalog for this filter. Try a different sector.");
+        } else {
+          h += '<h2 class="section">Recommended roles</h2><div class="table-wrap"><table class="data"><thead><tr><th>Role</th><th>Sector</th><th>Match</th><th>Missing skills</th></tr></thead><tbody>';
+          r.recommended_roles.forEach(function (x) {
+            h += "<tr><td><b>" + esc(x.job_title) + "</b><br><span style='color:var(--muted);font-size:12px'>" + esc(x.role_id) + "</span></td>" +
+              "<td>" + esc(x.sector || "—") + "</td>" +
+              '<td style="min-width:150px"><b>' + x.match_score + '%</b><div class="meter"><i style="width:' + x.match_score + '%"></i></div></td>' +
+              "<td>" + (x.missing_skills.length ? x.missing_skills.map((m) => '<a href="skill-detail.html?id=' + encodeURIComponent(m.skill_id) + '">' + esc(m.skill_name) + "</a>").join(", ") : "<i>none</i>") + "</td></tr>";
+          });
+          h += "</tbody></table></div>";
+        }
+        if ((r.unscored_roles || []).length) {
+          h += '<div class="evidence-strip">' + window.KIcon("info") + "<div><b>Unscored roles (not zero — excluded).</b> " +
+            r.unscored_roles.map((u) => esc(u.job_title) + ": " + esc(u.reason)).join(" · ") + "</div></div>";
+        }
+        h += '<div class="grid cols-2" style="margin-top:16px"><div class="card"><h3>Recommended courses</h3>' +
+          ((r.recommended_courses || []).length
+            ? "<ul style='margin:8px 0 0;padding-left:20px'>" + r.recommended_courses.map((c) =>
+              '<li style="margin:6px 0"><a href="course-detail.html?id=' + encodeURIComponent(c.course_id) + '"><b>' + esc(c.course_name) + "</b></a> — covers " + esc(c.covers.join(", ")) + "</li>").join("") + "</ul>"
+            : '<p class="hint">No catalogued course covers the missing skills yet.</p>') + "</div>" +
+          '<div class="card"><h3>Learning pathway</h3>' +
+          ((r.learning_pathway || []).length
+            ? "<ol style='margin:8px 0 0;padding-left:20px'>" + r.learning_pathway.map((p) => "<li style='margin:6px 0'>" + esc(p) + "</li>").join("") + "</ol>"
+            : '<p class="hint">Nothing to learn — full match.</p>') + "</div></div>";
+        if ((r.trend_context || []).length) {
+          h += '<h2 class="section">Trend context (sector-level)</h2><div class="grid cols-3">' +
+            r.trend_context.map((t) => '<div class="card"><span class="pill tag-blue">' + esc(t.direction || "") + "</span><h3 style='margin-top:8px'>" + esc(t.technology) + "</h3><p class='hint'>" + esc(t.evidence || "") + "</p></div>").join("") + "</div>";
+        }
+        h += '<div class="evidence-strip">' + window.KIcon("shield") + "<div>" + esc(r.evidence_note || "") + "</div></div>";
+        document.getElementById("out").innerHTML = h;
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Course Intelligence — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="courses">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      let all = [];
+
+      function band(c) {
+        if (c.alignment_score == null) return "Cannot assess";
+        if (c.alignment_score >= 80) return "Aligned";
+        if (c.alignment_score >= 65) return "Minor update";
+        return "Needs review";
+      }
+      function bandPill(c) {
+        const b = band(c);
+        const cls = b === "Aligned" ? "tag-green" : b === "Minor update" ? "tag-amber" : b === "Needs review" ? "tag-red" : "tag-grey";
+        return '<span class="pill ' + cls + '">' + b + "</span>";
+      }
+
+      async function load() {
+        page.innerHTML = '<div class="eyebrow">Curriculum intelligence</div><h1 class="title">Courses</h1><div class="grid cols-3"><div class="card"><div class="skel" style="height:200px"></div></div><div class="card"><div class="skel" style="height:200px"></div></div><div class="card"><div class="skel" style="height:200px"></div></div></div>';
+        try {
+          all = await window.KaushoraAPI.courses();
+          renderShell(); apply();
+        } catch (e) {
+          page.innerHTML = window.KShell.errorState(e.message, "reload");
+          window.reload = () => load();
+        }
+      }
+
+      function renderShell() {
+        const sectors = [...new Set(all.map((c) => c.sector).filter(Boolean))];
+        page.innerHTML =
+          '<div class="eyebrow">Curriculum intelligence · ' + all.length + ' live courses</div>' +
+          '<h1 class="title">Course &amp; Curriculum Intelligence</h1>' +
+          '<p class="subtitle">Each Qualification Pack scored against NCO role requirements. Market-demand weighting is withheld — no demand records exist — so scores are pure coverage.</p>' +
+          '<div class="card"><div class="grid cols-2" style="align-items:end">' +
+          '<div class="field" style="margin:0"><label for="fSec">Sector</label><select id="fSec" class="inline-filter" style="width:100%;padding:10px 13px"><option value="">All sectors</option>' +
+          sectors.map((s) => "<option>" + esc(s) + "</option>").join("") + "</select></div>" +
+          '<div class="field" style="margin:0"><label for="fBand">Alignment band</label><select id="fBand" class="inline-filter" style="width:100%;padding:10px 13px"><option value="">All bands</option><option>Aligned</option><option>Minor update</option><option>Needs review</option><option>Cannot assess</option></select></div>' +
+          "</div></div>" +
+          '<div class="grid cols-3" id="cards" style="margin-top:16px"></div>' +
+          '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Methodology.</b> alignment = (adequate + 0.5 × partial) / required × 100, where required skills are text-matched from NCO related_skills. Unmapped phrases are reported, never forced.</div></div>";
+        document.getElementById("fSec").addEventListener("change", apply);
+        document.getElementById("fBand").addEventListener("change", apply);
+      }
+
+      function apply() {
+        const s = document.getElementById("fSec").value, b = document.getElementById("fBand").value;
+        const rows = all.filter((c) => (!s || c.sector === s) && (!b || band(c) === b));
+        const el = document.getElementById("cards");
+        if (!rows.length) { el.innerHTML = window.KShell.emptyState("No courses match", "Adjust the sector or band filter."); return; }
+        el.innerHTML = rows.map(function (c) {
+          const n = (c.skills_taught || "").split(",").map((x) => x.trim()).filter(Boolean).length;
+          return '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:start">' +
+            '<div class="eyebrow">' + esc(c.sector || "") + " · " + esc(c.qualification_level || "") + "</div>" + bandPill(c) + "</div>" +
+            "<h3 style='margin-top:6px'>" + esc(c.course_name) + "</h3>" +
+            '<p class="hint">' + esc(c.provider || "") + " · " + esc(c.duration || "") + " · " + n + " skills taught</p>" +
+            '<div style="font-size:26px;font-weight:800">' + (c.alignment_score == null ? "—" : c.alignment_score + "%") + ' <span style="font-size:13px;font-weight:600;color:var(--muted)">coverage</span></div>' +
+            '<p class="hint">Action: <b>' + esc(c.recommended_action || "—") + "</b></p>" +
+            '<a class="btn ghost sm" href="course-detail.html?id=' + encodeURIComponent(c.id) + '">Analyze alignment</a></div>';
+        }).join("");
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

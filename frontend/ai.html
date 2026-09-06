@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kaushora AI — Grounded Labour-Market Assistant</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="ai">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      const PRESETS = [
+        "Which skills are most in demand?",
+        "Which courses need curriculum review?",
+        "What skills are missing in this course?",
+        "Which districts show the largest training gaps?",
+        "What career paths match my skills?"
+      ];
+
+      function load() {
+        page.innerHTML =
+          '<div class="eyebrow">Module 09 · Grounded assistant</div><h1 class="title">Kaushora AI</h1>' +
+          '<p class="subtitle">Answers strictly reflect registered catalog data and backend analytics. Statistics are never invented — where evidence is missing, it says so.</p>' +
+          '<div class="chat-wrap"><div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="presets">' +
+          PRESETS.map((p) => '<button class="chip preset" data-q="' + esc(p) + '">' + esc(p) + "</button>").join("") + "</div>" +
+          '<div class="chat-log" id="log" aria-live="polite"><div class="bubble ai">Ask about skills, courses, districts or careers. I answer from the live backend — try a preset above.</div></div>' +
+          '<form class="chat-input" id="f"><input id="q" placeholder="Ask a grounded question…" aria-label="Ask Kaushora AI" autocomplete="off" />' +
+          '<button class="btn" type="submit" id="go">Query</button></form></div>' +
+          '<div><div class="card"><div class="eyebrow">Data inspector</div><h3>Live audit</h3><div id="inspector"><div class="skel" style="height:120px"></div></div></div>' +
+          '<div class="card" style="margin-top:16px"><div class="eyebrow">How answers are built</div><h3>Synthesis pipeline</h3>' +
+          '<div class="audit-step"><span class="num">1</span><div><b>Analytics context</b><br><span style="color:var(--muted)">Live dashboard totals + top skills + actions.</span></div></div>' +
+          '<div class="audit-step"><span class="num">2</span><div><b>Grounded prompt</b><br><span style="color:var(--muted)">Model is instructed to use only context numbers.</span></div></div>' +
+          '<div class="audit-step"><span class="num">3</span><div><b>Model or fallback</b><br><span style="color:var(--muted)">Gemini when a key is configured, else a structured evidence summary.</span></div></div>' +
+          '<div class="audit-step"><span class="num">4</span><div><b>Integrity check</b><br><span style="color:var(--muted)">Insufficient-evidence questions get an explicit halt, not a guess.</span></div></div></div></div></div>';
+        document.querySelectorAll(".preset").forEach((b) => b.addEventListener("click", () => { document.getElementById("q").value = b.dataset.q; ask(); }));
+        document.getElementById("f").addEventListener("submit", (e) => { e.preventDefault(); ask(); });
+        inspect();
+      }
+
+      async function inspect() {
+        try {
+          const ds = await window.KaushoraAPI.dataStatus();
+          const c = ds.record_counts;
+          document.getElementById("inspector").innerHTML =
+            row("Catalogued skills", c.skills) + row("Courses", c.courses) + row("Job roles", c.job_roles) +
+            row("Trend signals", c.trends) + row("Demand records", c.job_postings + c.employer_surveys) +
+            '<p class="hint">Demand records are 0 by design — the assistant will refuse demand rankings.</p>';
+        } catch (e) { document.getElementById("inspector").innerHTML = window.KShell.errorState(e.message); }
+      }
+      function row(k, v) {
+        return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px"><span>' + k + '</span><b>' + v + "</b></div>";
+      }
+
+      async function ask() {
+        const input = document.getElementById("q"), log = document.getElementById("log"), btn = document.getElementById("go");
+        const q = input.value.trim();
+        if (!q) return;
+        log.insertAdjacentHTML("beforeend", '<div class="bubble user">' + esc(q) + "</div>");
+        input.value = "";
+        btn.disabled = true; btn.textContent = "…";
+        const thinking = document.createElement("div");
+        thinking.className = "bubble ai"; thinking.innerHTML = "<i>Consulting backend analytics…</i>";
+        log.appendChild(thinking); log.scrollTop = log.scrollHeight;
+        try {
+          const r = await window.KaushoraAPI.aiChat(q);
+          thinking.innerHTML = esc(r.answer) + '<div class="meta">' +
+            (r.ai_available ? "Generated with live model over backend analytics." : esc(r.note || "Structured evidence fallback.")) + "</div>";
+        } catch (e) {
+          thinking.innerHTML = "<b>Request failed.</b> " + esc(e.message);
+        } finally { btn.disabled = false; btn.textContent = "Query"; log.scrollTop = log.scrollHeight; }
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

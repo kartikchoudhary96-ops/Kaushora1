@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kaushora — Labour Market Intelligence &amp; Skill Alignment</title>
+  <meta name="description" content="Kaushora converts labour-market evidence into skill, curriculum and training decisions." />
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="css/design.css" />
+  <style>
+    .land-nav { display: flex; align-items: center; gap: 22px; padding: 16px 30px; max-width: 1240px; margin: 0 auto; }
+    .land-nav img { height: 40px; }
+    .land-nav .links { display: flex; gap: 4px; margin-left: 12px; }
+    .land-nav .links a { text-decoration: none; color: var(--ink-2); font-weight: 600; font-size: 14px; padding: 8px 13px; border-radius: 9px; }
+    .land-nav .links a:hover { background: var(--pistachio-soft); }
+    .land-nav .spacer { flex: 1; }
+    .cap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .cap { text-decoration: none; color: var(--ink); }
+    .cap svg { width: 30px; height: 30px; color: var(--pistachio-deep); margin-bottom: 8px; }
+    .cap h3 { margin: 2px 0 4px; font-size: 16px; }
+    .cap p { margin: 0; font-size: 13.5px; color: var(--muted); }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; }
+    @media (max-width: 900px) { .cap-grid { grid-template-columns: 1fr; } .steps { grid-template-columns: 1fr 1fr; } .land-nav .links { display: none; } }
+    @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="land-nav">
+    <a href="index.html" aria-label="Kaushora home"><img src="assets/kaushora-logo.png" alt="Kaushora Labour Intelligence" onerror="this.onerror=null;this.src='assets/brand.svg'" /></a>
+    <nav class="links" aria-label="Primary">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="skills.html">Skills</a>
+      <a href="courses.html">Courses</a>
+      <a href="careers.html">Careers</a>
+      <a href="ai.html">Kaushora AI</a>
+    </nav>
+    <span class="spacer"></span>
+    <a class="btn ghost sm" href="login.html">Login</a>
+    <a class="btn sm" href="dashboard.html">Open Dashboard</a>
+  </header>
+
+  <main class="page" style="max-width:1240px">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Labour Market Intelligence · Skill Alignment</div>
+        <h1>Turn labour-market evidence into training decisions.</h1>
+        <p class="lead">Kaushora converts industry demand into skill gaps, curriculum alignment, capacity plans and career guidance — every number traced to its source, every gap tied to an action.</p>
+        <div class="hero-ctas">
+          <a class="btn" href="dashboard.html">Open Dashboard</a>
+          <a class="btn ghost" href="skills.html">Explore Skills</a>
+        </div>
+        <div class="hero-stats" id="heroStats" aria-live="polite">
+          <div class="hs"><b><span class="skel" style="display:inline-block;width:52px;height:28px"></span></b><span>loading…</span></div>
+        </div>
+        <div class="logo-strip">Grounded in NCO 2015 · SSC Qualification Packs · WEF Future of Jobs reports</div>
+      </div>
+      <div class="hero-art"><img src="assets/hero-illustration.png" alt="Industry demand flowing through Kaushora into charts and trained people" onerror="this.onerror=null;this.src='assets/hero.svg'" /></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">Signature workflow</div>
+      <h2 class="section" style="margin-top:4px">Demand → Gap → Action</h2>
+      <p class="section-sub">Each stage is computed live from the authoritative dataset. Select a stage to inspect it.</p>
+      <div class="card" style="padding:14px"><img src="assets/feature-illustration-1.png" alt="Demand, gap, action and job-ready outcome flow" style="width:100%;height:auto" onerror="this.onerror=null;this.src='assets/feature-gap.svg'" /></div>
+      <div class="steps">
+        <a class="flow-step" href="dashboard.html"><span class="n">01</span><b>Demand</b><span>Real demand signals from the dataset — with honest gaps where records don't exist.</span></a>
+        <a class="flow-step" href="skills.html"><span class="n">02</span><b>Gap</b><span>Industry requirements compared against course and curriculum coverage.</span></a>
+        <a class="flow-step" href="courses.html"><span class="n">03</span><b>Action</b><span>Evidence-backed ADD, UPDATE and REVIEW recommendations per course.</span></a>
+        <a class="flow-step dark" href="careers.html"><span class="n">04</span><b>Outcome</b><span>Candidates matched to roles with missing skills and learning pathways.</span></a>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">Platform</div>
+      <h2 class="section" style="margin-top:4px">One intelligence loop, six working surfaces</h2>
+      <p class="section-sub">Everything below reads from the same backend — no mock screens.</p>
+      <div class="cap-grid" id="capGrid"></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">Live snapshot</div>
+      <h2 class="section" style="margin-top:4px">What the evidence says right now</h2>
+      <p class="section-sub" id="snapSub">Fetched live from the backend.</p>
+      <div class="grid cols-2" id="snapshot"><div class="card"><div class="skel" style="height:180px"></div></div><div class="card"><div class="skel" style="height:180px"></div></div></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">Responsible data</div>
+      <h2 class="section" style="margin-top:4px">No evidence, no number</h2>
+      <div class="card"><p style="margin:0">The catalog uses real public evidence (NCO, SSC Qualification Packs and WEF). To demonstrate every interactive feature, job demand, district capacity, placements and employer surveys use deterministic <b>synthetic demo data</b>, visibly marked <code>is_synthetic=1</code>. This keeps the demo complete without presenting generated values as real-world evidence.</p></div>
+    </section>
+
+    <footer class="footer">
+      <span><b style="color:var(--ink)">Kaushora</b> · Labour Market Intelligence &amp; Skill Alignment · hackathon MVP</span>
+      <span id="footSrc">Source: connecting…</span>
+    </footer>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const caps = [
+        ["dashboard.html", "grid", "Labour-market dashboard", "KPIs, demand landscape, alignment signals and actions."],
+        ["skills.html", "pulse", "Skill intelligence", "Searchable catalog with evidence trails per skill."],
+        ["courses.html", "book", "Curriculum alignment", "Coverage scoring with ADD / UPDATE / REVIEW guidance."],
+        ["districts.html", "pin", "District intelligence", "Honest capacity-gap states until records arrive."],
+        ["careers.html", "case", "Career guidance", "Deterministic skill-to-role matching with pathways."],
+        ["ai.html", "spark", "Kaushora AI", "Grounded answers over backend analytics — never invented stats."]
+      ];
+      document.getElementById("capGrid").innerHTML = caps.map(function (c) {
+        return '<a class="card cap" href="' + c[0] + '">' + window.KIcon(c[1]) + "<h3>" + c[2] + "</h3><p>" + c[3] + "</p></a>";
+      }).join("");
+
+      async function load() {
+        try {
+          const [ds, ov] = await Promise.all([window.KaushoraAPI.dataStatus(), window.KaushoraAPI.overview()]);
+          const c = ds.record_counts, t = ov.totals;
+          document.getElementById("heroStats").innerHTML =
+            stat(c.skills, "skills catalogued") + stat(c.courses, "QP courses") +
+            stat(c.job_roles, "NCO job roles") + stat(c.trends, "trend signals") +
+            stat(t.avg_alignment == null ? "—" : t.avg_alignment + "%", "avg. alignment");
+          document.getElementById("footSrc").textContent =
+            "Source: Real Evidence Dataset · ingested " + (ds.last_ingestion ? ds.last_ingestion.started_at.slice(0, 10) : "unknown");
+          const assessed = t.avg_alignment == null ? "Only courses with mappable roles can be scored." :
+            "Average coverage alignment " + t.avg_alignment + "% across assessable courses.";
+          document.getElementById("snapshot").innerHTML =
+            '<div class="card"><div class="eyebrow">Catalog</div><h3>' + c.skills + " skills · " + c.courses +
+            " courses · " + c.job_roles + ' roles</h3><p class="hint">National real-source catalog (NCO 2015, SSC Qualification Packs) plus clearly labelled Maharashtra synthetic demo records.</p>' +
+            '<a class="btn ghost sm" href="skills.html">Browse the catalog ' + window.KIcon("arrow") + "</a></div>" +
+            '<div class="card"><div class="eyebrow">Alignment</div><h3>Curriculum vs industry requirements</h3><p class="hint">' +
+            assessed + " QP-DEO and QP-GDA target roles outside the role catalog, so assessment is withheld rather than scored zero.</p>" +
+            '<a class="btn ghost sm" href="courses.html">Inspect alignment ' + window.KIcon("arrow") + "</a></div>";
+        } catch (e) {
+          document.getElementById("heroStats").innerHTML =
+            '<div class="hs"><b>—</b><span>Backend unreachable. Start it with <code>python app.py</code>.</span></div>';
+          document.getElementById("snapshot").innerHTML =
+            '<div class="card">' + window.KShellError(e) + "</div>";
+        }
+      }
+      function stat(v, l) { return '<div class="hs"><b>' + v + "</b><span>" + l + "</span></div>"; }
+      window.KShellError = function (e) {
+        return '<div class="error-box">' + window.KIcon("alert") + "<h3>Backend unreachable</h3><p>" +
+          String((e && e.message) || e) + "</p></div>";
+      };
+      load();
+    })();
+  </script>
+</body>
+</html>

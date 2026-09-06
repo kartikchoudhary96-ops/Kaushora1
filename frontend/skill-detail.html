@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skill Detail — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="skills">
+  <div id="shell"></div>
+  <script src="js/vendor/chart.umd.min.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      const id = new URLSearchParams(window.location.search).get("id") || "";
+
+      async function load() {
+        page.innerHTML = '<a href="skills.html" class="btn ghost sm">← All skills</a><div class="card" style="margin-top:14px"><div class="skel" style="height:280px"></div></div>';
+        if (!id) { page.innerHTML = window.KShell.emptyState("No skill selected", "Choose a skill from the Skill Intelligence page."); return; }
+        try {
+          const [detail, gap, demand] = await Promise.all([
+            window.KaushoraAPI.skill(id), window.KaushoraAPI.skillGap(id), window.KaushoraAPI.skillDemand(id)
+          ]);
+          render(detail, gap, demand);
+        } catch (e) {
+          page.innerHTML = '<a href="skills.html" class="btn ghost sm">← All skills</a><div style="margin-top:14px">' +
+            (e.status === 404 ? window.KShell.emptyState("Skill not found", "No skill with id “" + esc(id) + "” exists in the catalog.") : window.KShell.errorState(e.message, "reload")) + "</div>";
+          window.reload = () => load();
+        }
+      }
+
+      function render(d, gap, demand) {
+        document.title = d.skill_name + " — Kaushora Skill Detail";
+        let h = '<a href="skills.html" class="btn ghost sm">← All skills</a>' +
+          '<div class="eyebrow" style="margin-top:14px">' + esc(d.sector || "") + " · " + esc(d.category || "") + "</div>" +
+          "<h1 class='title'>" + esc(d.skill_name) + "</h1>" +
+          '<p class="subtitle">' + esc(d.description || "") + ' <span class="pill tag-grey">' + esc(d.demand_status) + "</span></p>" +
+          '<div class="grid cols-3">' +
+          '<div class="card kpi"><div class="k-label">Demand score</div><div class="k-value">' + (demand.demand_score == null ? "—" : demand.demand_score) + '</div><div class="k-sub">Synthetic demo demand signal</div><span class="k-tag tag-amber">' + esc(demand.demand_status) + '</span></div>' +
+          '<div class="card kpi"><div class="k-label">Gap severity</div><div class="k-value" style="font-size:22px;padding:6px 0">' + esc(gap.gap_severity) + '</div><div class="k-sub">' + esc(gap.gap_status) + '</div><span class="k-tag ' + (gap.gap_severity === "High" ? "tag-red" : gap.gap_severity === "Low" ? "tag-green" : "tag-grey") + '">' + esc(gap.gap_status) + "</span></div>" +
+          '<div class="card kpi"><div class="k-label">Technology status</div><div class="k-value" style="font-size:22px;padding:6px 0">' + esc(d.technology_status || "—") + '</div><div class="k-sub">Per active Qualification Pack</div><span class="k-tag tag-green">Current catalog</span></div></div>';
+
+        h += '<div class="grid cols-2" style="margin-top:16px"><div class="card"><div class="eyebrow">Skill gap bridge</div><h3>Requirement vs coverage</h3>' +
+          "<p class='hint'>Roles requiring this skill: <b>" + gap.required_by_roles.length + "</b> · Courses teaching it: <b>" + gap.taught_by_courses.length + "</b></p>" +
+          '<div class="chart-box sm"><canvas id="chGap"></canvas></div>' +
+          '<p class="hint">' + esc(gap.methodology) + "</p></div>" +
+          '<div class="card"><div class="eyebrow">Demand methodology</div><h3>How this score is calculated</h3><p class="hint">' + esc(demand.methodology) + "</p>" +
+          '<div class="meter" style="margin:8px 0"><i style="width:' + Math.max(0, Math.min(100, demand.demand_score || 0)) + '%"></i></div>' +
+          '<p class="hint">Job records citing this skill: <b>' + d.demand_count + "</b> · Employer citations: <b>" + (d.employer_demand || 0) + "</b></p></div></div>";
+
+        h += '<h2 class="section">Evidence</h2><p class="section-sub">Catalog evidence is sourced; demand evidence is clearly labelled synthetic demo data.</p><div class="grid cols-2">';
+        h += evCard("Related roles", (d.evidence_roles || []).map((r) => "<b>" + esc(r.role_id) + "</b> — " + esc(r.job_title)));
+        h += evCard("Teaching courses", (d.evidence_courses || []).map((c) => '<a href="course-detail.html?id=' + encodeURIComponent(c.id) + '"><b>' + esc(c.id) + "</b> — " + esc(c.course_name) + "</a>"));
+        h += "</div><div class='grid cols-2' style='margin-top:16px'>";
+        h += evCard("Citing job records (" + (d.evidence_jobs || []).length + ")", (d.evidence_jobs || []).map((j) => esc(j.job_title)), "No demo job-posting records cite this skill.");
+        h += evCard("Employer citations (" + (d.evidence_employers || []).length + ")", (d.evidence_employers || []).map((e) => esc(e.employer_name)), "No employer records cite this skill yet.");
+        h += "</div>";
+
+        const p = d.provenance || {};
+        h += '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Provenance.</b> " + esc(p.source || "") +
+          " · " + esc(p.publisher || "") + " · period " + esc(p.data_period || "") +
+          (p.source_url ? ' · <a href="' + esc(p.source_url) + '" target="_blank" rel="noopener">source link</a>' : "") +
+          ' · <code>is_synthetic=' + p.is_synthetic + "</code></div></div>";
+        page.innerHTML = h;
+        if (typeof Chart !== "undefined") {
+          new Chart(document.getElementById("chGap"), {
+            type: "bar",
+            data: { labels: ["Roles requiring", "Courses teaching"], datasets: [{ data: [gap.required_by_roles.length, gap.taught_by_courses.length], backgroundColor: ["#151515", "#4c7a35"], borderRadius: 8 }] },
+            options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { precision: 0 } } } }
+          });
+        }
+      }
+
+      function evCard(title, items, emptyMsg) {
+        return '<div class="card"><h3>' + esc(title) + "</h3>" +
+          (items.length ? "<ul style='margin:8px 0 0;padding-left:20px'>" + items.map((i) => "<li style='margin:5px 0'>" + i + "</li>").join("") + "</ul>"
+            : '<p class="hint">' + esc(emptyMsg || "None recorded.") + "</p>") + "</div>";
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>

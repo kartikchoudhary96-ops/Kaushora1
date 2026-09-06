@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>District Intelligence — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="districts">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      async function load() {
+        page.innerHTML = '<div class="eyebrow">District intelligence</div><h1 class="title">Districts</h1><div class="card"><div class="skel" style="height:240px"></div></div>';
+        try {
+          const rows = await window.KaushoraAPI.districts();
+          render(rows);
+        } catch (e) {
+          page.innerHTML = window.KShell.errorState(e.message, "reload");
+          window.reload = () => load();
+        }
+      }
+      function render(rows) {
+        let h = '<div class="eyebrow">District intelligence · ' + rows.length + ' records live</div>' +
+          '<h1 class="title">District Intelligence</h1>' +
+          '<p class="subtitle">Demand, training capacity, gaps, priorities and actions — at district resolution.</p>' +
+          '<div class="grid cols-2"><div class="card" style="display:flex;align-items:center;justify-content:center">' +
+          '<img src="assets/district-map.png" alt="District map — awaiting records" style="width:100%;max-width:420px;height:auto" onerror="this.onerror=null;this.src=\'assets/district-map.svg\'" /></div>';
+        if (!rows.length) {
+          h += '<div class="empty">' + window.KIcon("pin") + "<h3>No district records in the current dataset</h3>" +
+            "<p>DISTRICT_SKILL_DEMAND and TRAINING_CAPACITY tables are intentionally empty: no consistent, citable district-level source was available. Kaushora reports this gap instead of estimating it. Re-ingest the dataset when district sources arrive and this page will populate automatically.</p></div></div>";
+        } else {
+          h += '<div class="table-wrap"><table class="data"><thead><tr><th>District</th><th>Demand</th><th>Capacity</th><th>Gap</th><th></th></tr></thead><tbody>' +
+            rows.map((d) => "<tr><td><b>" + esc(d.district) + "</b></td><td>" + (d.estimated_training_demand == null ? "—" : d.estimated_training_demand) +
+              "</td><td>" + (d.annual_training_capacity == null ? "—" : d.annual_training_capacity) + "</td><td><b>" + d.capacity_gap +
+              '</b></td><td><a class="btn ghost sm" href="district-detail.html?id=' + encodeURIComponent(d.district_id) + '">Open</a></td></tr>').join("") +
+            "</tbody></table></div></div>";
+        }
+        h += '<h2 class="section">How to read this demo</h2><p class="section-sub">District capacity, placements and postings are deterministic synthetic records, clearly labelled throughout the product.</p>' +
+          '<div class="grid cols-3">' +
+          '<div class="card"><h3>Demand → Capacity → Gap</h3><p class="hint">Registered demand signal minus annual training capacity per district, with the documented normalization.</p></div>' +
+          '<div class="card"><h3>Priority &amp; plan</h3><p class="hint">Increase capacity, introduce or review courses, strengthen trainers — each with an evidence trail.</p></div>' +
+          '<div class="card"><h3>Placement overlay</h3><p class="hint">Course- and district-level outcomes joined to capacity once placement sources exist.</p></div></div>';
+        page.innerHTML = h;
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>
