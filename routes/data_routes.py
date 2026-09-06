@@ -45,7 +45,7 @@ def data_status():
         {
             "success": True,
             "data": {
-                "dataset_loaded": counts.get("skills", 0) > 0,
+                "dataset_loaded": (counts.get("skills") or 0) > 0,
                 "last_ingestion": last_run,
                 "record_counts": counts,
                 "available_entities": [t for t in TABLES if (counts.get(t) or 0) > 0],
