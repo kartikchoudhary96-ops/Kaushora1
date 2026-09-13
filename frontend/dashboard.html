@@ -31,54 +31,62 @@
           '<p class="subtitle">Understand demand, identify gaps and turn evidence into action across institutional curricula.</p>' +
           window.KShell.skeletonCards(5) + '<div class="card" style="margin-top:16px"><div class="skel" style="height:220px"></div></div>';
         try {
-          const [ov, courses, croles, trends, ds] = await Promise.all([
+          const [ov, courses, croles, trends, ds, ev, ind, recs] = await Promise.all([
             window.KaushoraAPI.overview(), window.KaushoraAPI.courses(),
-            window.KaushoraAPI.careerRoles(), window.KaushoraAPI.trends(), window.KaushoraAPI.dataStatus()
+            window.KaushoraAPI.careerRoles(), window.KaushoraAPI.trends(), window.KaushoraAPI.dataStatus(),
+            window.KaushoraAPI.evidence(), window.KaushoraAPI.indicators(), window.KaushoraAPI.recommendations()
           ]);
-          render(ov, courses, croles, trends, ds);
+          render(ov, courses, croles, trends, ds, ev, ind, recs);
         } catch (e) {
           page.innerHTML = window.KShell.errorState(e.message, "reload");
           window.reload = () => load();
         }
       }
 
-      function render(ov, courses, croles, trends, ds) {
+      function render(ov, courses, croles, trends, ds, ev, ind, recs) {
         const t = ov.totals;
         const alignTxt = t.avg_alignment == null ? "—" : t.avg_alignment + "%";
         let h = '<div class="eyebrow">Overview · ' + esc(ds.last_ingestion ? ds.last_ingestion.started_at.slice(0, 10) : "live") + "</div>" +
           '<h1 class="title">Labour Market Intelligence</h1>' +
-          '<p class="subtitle">Understand demand, identify gaps and turn evidence into action across institutional curricula.</p>' +
+          '<p class="subtitle">Maharashtra-focused skill intelligence from PLFS, NSDC, PMKVY, DVET and DGT sources — every figure traced to its record.</p>' +
           '<div class="grid kpis">' +
-          kpi("Skills tracked", t.unique_skills, "Across catalogued sectors", "Real catalog", "tag-green") +
-          kpi("Training courses", t.courses, "NSQF Qualification Packs", "Active QPs", "tag-green") +
-          kpi("Job roles", t.roles, "NCO 2015 classification", "Official classes", "tag-green") +
-          kpi("Trend signals", t.trends, "WEF qualitative evidence", "Sector-level", "tag-blue") +
-          kpi("Avg. alignment", alignTxt, "Assessable course coverage", t.avg_alignment == null ? "Cannot assess" : "Coverage-based", t.avg_alignment == null ? "tag-grey" : "tag-green") +
+          kpi("Skills tracked", t.unique_skills, "Real catalog (SKL001–020)", "Source data", "tag-green") +
+          kpi("Training courses", t.courses, "Government ITI courses", "Source data", "tag-green") +
+          kpi("Occupations", t.roles, "NSDC QPs with NSQF levels", "Source data", "tag-green") +
+          kpi("Districts covered", t.districts, "Maharashtra registry · " + t.centres + " centres recorded", "Source data", "tag-green") +
+          kpi("Avg. alignment", alignTxt, "Assessable course coverage", t.avg_alignment == null ? "Cannot assess" : "Derived by Kaushora", t.avg_alignment == null ? "tag-grey" : "tag-amber") +
           "</div>";
 
         h += '<div class="evidence-strip" style="margin:16px 0 0">' + window.KIcon("db") +
-          "<div><b>Demand records analysed: " + t.jobs_analysed + ".</b> These are deterministic synthetic demo job postings, combined with labelled synthetic employer surveys to make demand scoring interactive. The skills, roles, courses and trends remain real-source catalog records.</div></div>";
+          "<div><b>Per-skill demand scores: unavailable.</b> The source skill_demand assessment is NULL for every signal, so no demand ranking is fabricated. National aggregates (LFPR, NCS vacancies) appear below as evidence — never converted into skill scores.</div></div>";
+
+        h += '<h2 class="section">Recorded labour-market evidence</h2>' +
+          '<p class="section-sub">Observed values with source references — not estimates.</p>' +
+          '<div class="grid kpis" id="evKpis"></div>' +
+          '<div class="grid cols-2" style="margin-top:16px">' +
+          '<div class="card"><div class="eyebrow">PLFS 2025 · Usual status</div><h3>LFPR / WPR / UR by group</h3><p class="hint">All-India, 15 years and above. District-level PLFS is not published.</p><div class="chart-box sm"><canvas id="chInd"></canvas></div></div>' +
+          '<div class="card"><div class="eyebrow">Evidence-based actions</div><h3>Recommendations</h3><p class="hint">Provided derivations + Kaushora derivations from live evidence.</p><div id="recList"></div></div></div>';
 
         h += '<div class="grid cols-23" style="margin-top:16px">' +
-          '<div class="card"><div class="eyebrow">Signature · Skill × Role coverage</div><h3>Skill Demand Landscape</h3>' +
-          '<p class="hint">Which catalogued skills do NCO roles require, and which courses teach them? Green = required &amp; taught · red = required but untaught · grey = taught, no mapped requirement. Select a row for detail.</p>' +
+          '<div class="card"><div class="eyebrow">Signature · Skill × Role coverage</div><h3>Skill Coverage Landscape</h3>' +
+          '<p class="hint">Explicit NOS occupation requirements vs recorded course coverage (scorable occupations only). Green = required &amp; taught · red = required but untaught · grey = taught, no mapped requirement. Select a row for detail.</p>' +
           '<div id="matrix"></div></div>' +
           '<div class="card"><div class="eyebrow">Priority alignment signals</div><h3>Actions</h3><p class="hint">From live course alignment + trend evidence.</p><div id="actions"></div></div></div>';
 
         h += '<div class="grid cols-2" style="margin-top:16px">' +
-          '<div class="card"><div class="eyebrow">Catalog composition</div><h3>Skills by sector</h3><p class="hint">Live counts from the skills catalog.</p><div class="chart-box sm"><canvas id="chSector"></canvas></div></div>' +
-          '<div class="card"><div class="eyebrow">Training footprint</div><h3>Skills taught per course</h3><p class="hint">Counts from live course records (QP curricula).</p><div class="chart-box sm"><canvas id="chCourse"></canvas></div></div></div>';
+          '<div class="card"><div class="eyebrow">Catalog composition</div><h3>Occupations by sector</h3><p class="hint">Live counts from the 32-occupation registry.</p><div class="chart-box sm"><canvas id="chSector"></canvas></div></div>' +
+          '<div class="card"><div class="eyebrow">Training footprint</div><h3>Recorded skill coverage per course</h3><p class="hint">Explicit course-skill links (12 recorded; courses without rows show honestly as 0).</p><div class="chart-box sm"><canvas id="chCourse"></canvas></div></div></div>';
 
         h += '<h2 class="section">Where Training May Not Match Demand</h2>' +
-          '<p class="section-sub">Live course alignment against NCO role requirements.</p><div id="mismatch"></div>';
+          '<p class="section-sub">Live course alignment against explicit NOS occupation requirements (same-sector only).</p><div id="mismatch"></div>';
 
         h += '<div class="grid cols-23" style="margin-top:16px">' +
           '<div><h2 class="section" style="margin-top:0">Priority Competencies Registry</h2>' +
-          '<p class="section-sub">Catalogued skills ranked by cross-role versatility (live role-mapping count — not a demand index).</p><div id="registry"></div></div>' +
+          '<p class="section-sub">Catalogued skills ranked by cross-role versatility (live explicit-mapping count — not a demand index).</p><div id="registry"></div></div>' +
           '<div><h2 class="section" style="margin-top:0">Regional Disparity Index</h2>' +
-          '<p class="section-sub">District demand concentration vs training seats.</p>' +
-          '<div class="card" style="text-align:center"><img src="assets/district-map.png" alt="Maharashtra district demo map" style="width:100%;max-width:300px;height:auto" onerror="this.onerror=null;this.src=\'assets/district-map.svg\'" />' +
-          '<p class="hint" style="margin-top:10px">' + t.districts + ' Maharashtra demo districts with a total capacity gap of <b>' + (t.capacity_gap == null ? "—" : t.capacity_gap) + '</b>. Records are synthetic and marked accordingly.</p>' +
+          '<p class="section-sub">Recorded training centres across 36 Maharashtra districts.</p>' +
+          '<div class="card" style="text-align:center"><img src="assets/district-map.png" alt="Maharashtra district map" style="width:100%;max-width:300px;height:auto" onerror="this.onerror=null;this.src=\'assets/district-map.svg\'" />' +
+          '<p class="hint" style="margin-top:10px"><b>' + t.centres + ' centres recorded in 2 of ' + t.districts + ' districts</b> (Ahilyanagar 7, Nagpur 1). Capacity gaps cannot be estimated — training demand is unpublished.</p>' +
           '<a class="btn ghost sm" href="districts.html">Open district intelligence</a></div></div></div>';
 
         h += '<h2 class="section">Emerging signals (qualitative)</h2>' +
@@ -92,11 +100,48 @@
         page.innerHTML = h;
         renderMatrix(croles, courses);
         renderActions(ov.actions || []);
-        renderSectorChart(courses);
+        renderSectorChart(croles);
         renderCourseChart(courses);
         renderMismatch(courses);
         renderRegistry(ov.top_skills || []);
         renderTrends(trends.trend_signals || []);
+        renderEvidence(ev || []);
+        renderIndicators(ind || []);
+        renderRecs(recs || []);
+      }
+
+      function renderEvidence(ev) {
+        const pick = ["EV001", "EV003", "EV008", "EV006", "EV010"];
+        const cards = ev.filter(function (e) { return pick.indexOf(e.evidence_id) >= 0; });
+        document.getElementById("evKpis").innerHTML = cards.map(function (e) {
+          return '<div class="card kpi"><div class="k-label">' + esc(e.metric_name) + '</div>' +
+            '<div class="k-value" style="font-size:24px">' + esc(e.metric_value) + " " + esc(e.unit || "") + "</div>" +
+            '<div class="k-sub">' + esc(e.geography || "") + " · " + esc(e.time_period || "") + "</div>" +
+            '<span class="k-tag tag-green">Source data</span></div>';
+        }).join("");
+      }
+
+      function renderIndicators(ind) {
+        const rows = ind.filter(function (r) { return ["LFPR", "WPR", "UR"].indexOf(r.indicator_name) >= 0 && r.population_group === "15 years and above" && r.rural_urban === "Total"; });
+        drawChart("chInd", {
+          type: "bar",
+          data: { labels: rows.map(function (r) { return r.indicator_name; }),
+                  datasets: [{ data: rows.map(function (r) { return r.indicator_value; }), backgroundColor: PAL.slice(0, rows.length), borderRadius: 8 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                     scales: { y: { title: { display: true, text: "% (PLFS 2025 usual status)" } } } }
+        });
+      }
+
+      function renderRecs(recs) {
+        const el = document.getElementById("recList");
+        if (!recs.length) { el.innerHTML = window.KShell.emptyState("No recommendations", "No recommendation records available."); return; }
+        el.innerHTML = recs.slice(0, 5).map(function (r) {
+          const cls = r.priority === "High" ? "tag-red" : r.priority === "Medium" ? "tag-amber" : "tag-grey";
+          return '<div style="padding:9px 0;border-bottom:1px solid var(--line-soft)"><span class="pill ' + cls + '">' + esc(r.priority || "") + "</span> " +
+            '<span class="pill tag-grey">' + (r.engine ? "Derived by Kaushora" : "Source derivation") + "</span>" +
+            '<div style="font-weight:700;margin-top:5px">' + esc(r.recommendation_text || "") + "</div>" +
+            '<div style="font-size:12.5px;color:var(--muted)">' + esc(r.reason || "") + "</div></div>";
+        }).join("");
       }
 
       function renderMatrix(croles, courses) {
@@ -111,9 +156,13 @@
             (c.skills_taught || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean)
               .forEach(function (s) { (taught[s] = taught[s] || new Set()).add(c.id); });
           });
-          const roleIds = croles.map(function (r) { return r.role_id; });
-          let h = '<div class="table-wrap"><table class="data" style="min-width:560px"><thead><tr><th>Skill</th>' +
-            roleIds.map(function (r) { return "<th>" + esc(r.replace("NCO-", "")) + "</th>"; }).join("") + "<th>Taught by</th></tr></thead><tbody>";
+          // Scorable occupations only: 4 carry explicit requirements; the other
+          // 28 would render as empty columns, so they are honestly excluded.
+          const scorable = croles.filter(function (r) { return (r.required_skills || []).length > 0; });
+          const roleIds = scorable.map(function (r) { return r.role_id; });
+          let h = '<p class="hint">Columns: explicitly-mapped occupations only (' + roleIds.length + ' of ' + croles.length + '). Remaining occupations carry no published NOS skill links.</p>' +
+            '<div class="table-wrap"><table class="data" style="min-width:560px"><thead><tr><th>Skill</th>' +
+            roleIds.map(function (r) { return "<th title='" + esc((scorable.filter(function (x) { return x.role_id === r; })[0] || {}).job_title || r) + "'>" + esc(r) + "</th>"; }).join("") + "<th>Taught by</th></tr></thead><tbody>";
           skills.slice().sort(function (a, b) { return a.skill_name.localeCompare(b.skill_name); }).forEach(function (s) {
             h += '<tr class="clickable" data-skill="' + s.id + '"><td><b>' + esc(s.skill_name) + '</b><br><span style="color:var(--muted);font-size:12px">' + esc(s.sector || "") + "</span></td>";
             roleIds.forEach(function (r) {
@@ -147,15 +196,13 @@
         }).join("");
       }
 
-      function renderSectorChart(courses) {
-        window.KaushoraAPI.skills().then(function (skills) {
-          const counts = {};
-          skills.forEach(function (s) { counts[s.sector || "Other"] = (counts[s.sector || "Other"] || 0) + 1; });
-          drawChart("chSector", {
-            type: "doughnut",
-            data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: PAL, borderColor: "#fff", borderWidth: 3 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } }
-          });
+      function renderSectorChart(croles) {
+        const counts = {};
+        croles.forEach(function (r) { counts[r.sector || "Unmapped"] = (counts[r.sector || "Unmapped"] || 0) + 1; });
+        drawChart("chSector", {
+          type: "doughnut",
+          data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: PAL, borderColor: "#fff", borderWidth: 3 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } }
         });
       }
 
@@ -206,7 +253,7 @@
           h += "<tr><td><b>" + esc(s.skill_name) + "</b></td>" +
             "<td><b>" + (s.related_roles || []).length + "</b> role(s)</td>" +
             "<td>" + esc(s.sector || "—") + "</td>" +
-            '<td><span class="pill ' + (s.demand_status === "Critical Demand" || s.demand_status === "High Demand" ? "tag-red" : "tag-amber") + '">' + esc(s.demand_status) + '</span></td>' +
+            '<td><span class="pill ' + (s.demand_status === "Insufficient data" ? "tag-grey" : "tag-red") + '">' + esc(s.demand_status) + '</span></td>' +
             '<td><a class="btn ghost sm" href="skill-detail.html?id=' + encodeURIComponent(s.id) + '">Dossier</a></td></tr>';
         });
         document.getElementById("registry").innerHTML = h + "</tbody></table></div>";

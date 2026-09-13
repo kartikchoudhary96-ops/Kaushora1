@@ -1,0 +1,4 @@
+capacity_id,district_id,scheme,training_centres,training_seats,enrolments,assessments,certifications,year,period,source_id
+CAP001,DT001,PMKVY 4.0,12,,,,,2025,As on 31.12.2025,SRC005
+CAP002,DT002,PMKVY 4.0,,,,,,2025,As on 31.12.2025,SRC005
+CAP003,DT019,CTS,,120,,,,2025,2025-26,SRC009

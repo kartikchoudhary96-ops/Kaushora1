@@ -48,9 +48,9 @@
           const ds = await window.KaushoraAPI.dataStatus();
           const c = ds.record_counts;
           document.getElementById("inspector").innerHTML =
-            row("Catalogued skills", c.skills) + row("Courses", c.courses) + row("Job roles", c.job_roles) +
-            row("Trend signals", c.trends) + row("Demand records", c.job_postings + c.employer_surveys) +
-            '<p class="hint">Demand records are 0 by design — the assistant will refuse demand rankings.</p>';
+            row("Catalogued skills", c.skills) + row("Courses", c.courses) + row("Occupations", c.job_roles) +
+            row("Districts", c.districts) + row("Indicators", c.labour_indicators) + row("Evidence metrics", c.evidence_metrics) +
+            '<p class="hint">Per-skill demand is unpublished in source — the assistant refuses demand rankings and cites evidence instead.</p>';
         } catch (e) { document.getElementById("inspector").innerHTML = window.KShell.errorState(e.message); }
       }
       function row(k, v) {

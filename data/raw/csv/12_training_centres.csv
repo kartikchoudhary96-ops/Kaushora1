@@ -1,0 +1,9 @@
+centre_id,centre_name,district_id,state_id,scheme,provider,centre_type,source_id
+TC001,C D Jain college of commerce,DT001,ST001,PMKVY 4.0,Private,Training Centre,SRC005
+TC002,Dhansampada training center2,DT001,ST001,PMKVY 4.0,Private,Training Centre,SRC005
+TC003,MECH INF CENTRE & SCHOOL Ahmednagar,DT001,ST001,PMKVY 4.0,Government,Training Centre,SRC005
+TC004,Arihant College of Pharmacy,DT001,ST001,PMKVY 4.0,Private,Training Centre,SRC005
+TC005,ARMOURED CORPS CENTRE & SCHOOL,DT001,ST001,PMKVY 4.0,Government,Training Centre,SRC005
+TC006,Dnyaneshwar Sahakari Dudh Utpadak Sangha,DT001,ST001,PMKVY 4.0,Cooperative,Training Centre,SRC005
+TC007,Govt. Industrial Training Institute Ahmednagar,DT001,ST001,PMKVY 4.0,Government,ITI,SRC005
+TC008,Late Annaji Kubitkar Government ITI Saoner,DT019,ST001,CTS,Government,ITI,SRC009

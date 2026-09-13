@@ -1,0 +1,14 @@
+qualification_id,qualification_name,qp_code,occupation_id,nsqf_level,qualification_status,source_id
+QUA001,Gardener,AGR/Q0801,OCC001,4,Active,SRC003
+QUA002,Hand Embroiderer,AMH/Q1001,OCC002,4,Active,SRC003
+QUA003,Inline Checker,AMH/Q0102,OCC003,3,Active,SRC003
+QUA004,Packer,AMH/Q1407,OCC004,3,Active,SRC003
+QUA005,Pressman,AMH/Q0401,OCC005,4,Active,SRC003
+QUA006,Self Employed Tailor,AMH/Q1947,OCC006,4,Active,SRC003
+QUA007,Sewing Machine Operator,AMH/Q0301,OCC007,4,Active,SRC003
+QUA008,Pedicurist and Manicurist,BWS/Q0402,OCC008,3,Active,SRC003
+QUA009,Assistant Hair Stylist,BWS/Q0201,OCC009,3,Active,SRC003
+QUA010,Hair Stylist,BWS/Q0202,OCC010,4,Active,SRC003
+QUA011,Assistant Beauty Therapist,BWS/Q0101,OCC011,3,Active,SRC003
+QUA012,Beauty Therapist,BWS/Q0102,OCC012,4,Active,SRC003
+QUA013,Field Technician – Washing Machine,ELE/Q3106,OCC013,4,Active,SRC004

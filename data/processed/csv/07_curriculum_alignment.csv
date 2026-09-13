@@ -1,0 +1,6 @@
+alignment_id,course_id,occupation_id,required_skill_count,covered_skill_count,missing_skill_count,alignment_score,missing_skills,recommended_updates,source_ids,is_derived
+CRA001,CRS001,OCC025,2,2,0,100.0,,,SRC009,TRUE
+CRA002,CRS002,OCC026,2,2,0,100.0,,,SRC009,TRUE
+CRA003,CRS003,OCC027,2,2,0,100.0,,,SRC009,TRUE
+CRA004,CRS004,OCC014,2,2,0,100.0,,,SRC009,TRUE
+CRA005,CRS010,OCC032,2,2,0,100.0,,,SRC009,TRUE

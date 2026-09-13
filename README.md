@@ -1,33 +1,55 @@
 # Kaushora — Labour Market Intelligence & Skill Alignment Platform
 
-> **Data notice:** Kaushora runs on the **Kaushora Real Evidence Dataset**
-> (`data/raw/kaushora_real_evidence_dataset.md`) — real, publicly sourced
-> records (NCO 2015, SSC NASSCOM / HSSC Qualification Packs, WEF Future of
-> Jobs reports). Factual rows carry `is_synthetic=0` with source URLs.
-> Sections without accessible public data (job demand, district capacity,
-> placements, employer requirements) are intentionally **empty** — the API
-> and the frontend return honest `insufficient-data` states instead of
-> inventing values. This is a hackathon prototype, not an official labour-market release.
+> **Data notice:** Kaushora runs on a **real public dataset** — 18 CSV files
+> (`data/raw/csv/`) from PLFS/MoSPI, NSDC, PMKVY/MSDE, NCS, DGT, DVET
+> Maharashtra and WEF: 36 Maharashtra districts, 32 NSDC occupations, 20
+> skills, 15 ITI courses, 15 labour indicators, 10 evidence metrics.
+> Every row is `is_synthetic=0, data_source='REAL'`. Where the source
+> publishes nothing (per-skill demand, district demand, placements, employer
+> requirements), the product shows **Insufficient data** — never estimates.
+> Derived metrics are labeled **Derived by Kaushora** with formulas in
+> `DATA_PIPELINE.md`. This is a hackathon prototype, not official statistics.
 
-## Purpose
+## 1. Kaushora overview
 
-Evidence-based decision support that turns labour-market records into
-Demand → Gap → Action intelligence for training authorities, institutes,
-employers and candidates. Numbers always come from the SQLite database via
-deterministic analytics — never from the frontend, never from the AI layer.
+Kaushora is a labour-market intelligence and skill-alignment platform for
+Maharashtra: it turns public records (PLFS indicators, NSDC qualification
+packs, PMKVY/DVET training presence, ITI courses) into skill registries,
+curriculum alignment, district intelligence, career guidance and grounded AI
+answers — every figure traced to its source row.
 
-## Architecture
+## 2. Problem being solved
+
+Skill-development programmes are often designed from broad or historical
+categories that lag changing technologies, local demand and employer
+expectations, while trainees complete courses with limited placement
+potential. Kaushora provides the continuous evidence loop the problem
+statement demands: Demand → Gap → Action, where each action carries an
+evidence trail back to real records.
+
+## 3. Architecture
 
 ```
-data/raw/kaushora_real_evidence_dataset.md
-  -> scripts/parse_evidence_dataset.py (parse + validate: PKs, FKs, numerics, provenance)
-  -> scripts/import_data.py (transactional, idempotent import -> SQLite)
-  -> database/kaushora.db
-  -> services/analytics_service.py + skill_gap_service.py (live deterministic calculations)
-  -> Flask REST API (routes/) -> frontend / judges / tests
-Kaushora AI (services/ai_service.py): DB -> analytics context -> Gemini (optional) or structured fallback.
-AI never invents statistics; it only explains backend numbers.
+Real Dataset (18 CSV: PLFS/NSDC/MSDE/DGT/DVET/WEF)
+  ↓ Raw Data (data/raw/csv/, byte copies, never modified)
+  ↓ Cleaning and Normalization (scripts/parse_csv_dataset.py → data/processed/csv/)
+  ↓ Database (scripts/import_csv_data.py → SQLite, FK-enforced, transactional)
+  ↓ Backend Analytics (services/: observed vs derived, deterministic)
+  ↓ REST API (routes/: stable contracts + /api/indicators|evidence|recommendations)
+  ↓ Frontend (fetch → render; no hardcoded data)
+  ↓ Dynamic Charts and Infographics (Chart.js + SVG, all API-driven)
+  ↓ Kaushora AI (retrieved DB context → Gemini or grounded fallback)
 ```
+
+## Technology Stack & Rationale
+
+- **Frontend:** HTML/CSS/JavaScript (vanilla) — no framework overhead, instant load, full control for premium SaaS styling. Chosen for hackathon speed and auditability.
+- **Visualization:** Chart.js 4.4.1 (vendored `frontend/js/vendor/chart.umd.min.js`) + SVG/CSS — Chart.js for bar/doughnut with tooltips/legends; SVG for custom skill×role matrix, gap bridges, district map. All data-driven, no static image charts.
+- **Backend:** Python 3.14 + Flask 3.1 REST API — minimal, reliable, hackathon-proven. Same language as data pipeline.
+- **Database:** SQLite (`database/kaushora.db`, git-ignored) — swappable to PostgreSQL via `DATABASE_PATH` env; zero-config for judges.
+- **Data pipeline:** 18 CSV files → `scripts/parse_csv_dataset.py` (validate PKs/FKs/provenance, ragged-row repair) → `scripts/import_csv_data.py` (transactional, idempotent) → normalized SQLite → `services/` analytics → Flask.
+- **AI:** `services/ai_service.py` — retrieves live DB records (indicators, alignments, districts, recommendations) → optional Gemini (`GEMINI_API_KEY`) → deterministic grounded fallback. Never source of numerical truth.
+- **Version control:** Git + `.gitignore` (excludes `.env`, `*.db`, `__pycache__`).
 
 ## Technology Stack & Rationale
 
@@ -39,21 +61,38 @@ AI never invents statistics; it only explains backend numbers.
 - **AI:** `services/ai_service.py` — retrieves live analytics context → optional Gemini (`GEMINI_API_KEY`) → structured fallback (`fallback_answer`). Never source of numerical truth.
 - **Version control:** Git + `.gitignore` (excludes `.env`, `*.db`, `__pycache__`).
 
-## Setup (Windows PowerShell)
+## 6. Setup & 8. Running locally (Windows PowerShell)
 
 ```powershell
 Set-Location -LiteralPath "C:\Users\ASUS\OneDrive\Desktop\KAUSHORA(FN)"
 pip install -r requirements.txt
 Copy-Item .env.example .env   # once; set GEMINI_API_KEY inside for live AI
-python scripts/init_db.py     # create schema (+ demo users)
-python scripts/import_data.py # import canonical dataset (validated, transactional)
-python scripts/seed_synthetic.py # add deterministic, labelled demo records for all interactive features
-python app.py                 # start server on http://127.0.0.1:5000
+python scripts/init_db.py       # create schema (+ demo users)
+python scripts/import_csv_data.py  # import canonical CSV dataset (validated, transactional)
+python scripts/restore_wef_trends.py  # restore 3 real WEF trend rows (once)
+python app.py                   # start server on http://127.0.0.1:5000
 ```
 
-Re-running `import_data.py` replaces dataset rows without duplicating and
-never touches `users` or user-submitted employer surveys. Invalid data
-aborts the import with the database untouched (tested).
+Re-running `import_csv_data.py` replaces dataset rows without duplicating and
+never touches `users` or observed employer surveys. Validation failure aborts
+with the database untouched (tested). Retired scripts live in
+`scripts/archive/` and must not be run (the old importer would wipe the catalog).
+
+## 7. Dataset ingestion
+
+`parse_csv_dataset.py`: loads 18 CSVs → strips whitespace → NULL tokens to
+NULL (never zero-filled) → repairs 3 ragged `01_sources` rows (logged) →
+validates PK uniqueness, FK references, numerics, source refs → writes
+`data/processed/csv/` + `data_quality_report.json` (0 errors).
+`import_csv_data.py`: enriches provenance from the `sources` table, derives
+skill sectors deterministically, rebuilds aliases, refreshes `dataset_meta`,
+appends `ingestion_runs` — all in one transaction.
+
+## 9. Environment variables
+
+See `.env.example` (no secrets committed): `FLASK_SECRET_KEY`,
+`GEMINI_API_KEY` (optional — AI falls back gracefully without it),
+`GEMINI_MODEL`, `DATABASE_PATH`, `PORT`, `FLASK_DEBUG` (dev only).
 
 ## Demo login
 
@@ -62,60 +101,64 @@ aborts the import with the database untouched (tested).
 
 Session-based, hackathon-grade auth only — not production security.
 
-## API endpoints
+## 10. API overview
 
 | Method | Path | Result on current dataset |
 |---|---|---|
 | GET | /api/health | `{status, database, timestamp}` |
-| GET | /api/data/status | record counts, entities, coverage, last ingestion run |
-| GET | /api/dashboard/overview | totals, actions, meta (+ honest `insufficient` list) |
-| GET | /api/dashboard/demand | skills with `demand_score: null` + reason |
-| GET | /api/dashboard/trends | 3 WEF trend signals, empty time series |
-| GET | /api/skills `?q=&sector=&status=` | 9 real skills, all `Insufficient Evidence` |
-| GET | /api/skills/\<id\> | detail + evidence roles/courses, provenance |
-| GET | /api/skills/\<id\>/demand | score/methodology (currently unavailable) |
-| GET | /api/skills/\<id\>/gap | required-by roles vs taught-by courses |
-| GET | /api/sectors, /api/roles | distinct sectors; 4 NCO roles |
-| GET | /api/courses | 3 QPs with alignment score/action |
+| GET | /api/data/status | 23 tables' counts, entities, coverage, last ingestion run |
+| GET | /api/dashboard/overview | totals (20/15/32/36/8), sector/district composition, actions, evidence |
+| GET | /api/dashboard/demand | 20 skills, all `demand_score: null` + honest reason |
+| GET | /api/dashboard/trends | 3 WEF signals, empty time series + note |
+| GET | /api/indicators `?state_id=` | 15 PLFS rows (state/national; district NULL = unpublished) |
+| GET | /api/evidence | 10 citable metrics with source references |
+| GET | /api/recommendations | 3 provided + engine rows (`engine:true`) |
+| GET | /api/skills `?q=&sector=&status=` | 20 real skills, all `Insufficient data` |
+| GET | /api/skills/\<id\> | detail + explicit occupation evidence + provenance + `data_source` |
+| GET | /api/skills/\<id\>/demand | null score + honest methodology |
+| GET | /api/skills/\<id\>/gap | required-by vs taught-by from explicit mappings |
+| GET | /api/sectors, /api/roles | 13 sectors; 32 NSDC occupations |
+| GET | /api/courses | 15 ITI courses with engine alignment |
 | GET | /api/courses/\<id\> | course record / 404 |
-| GET | /api/courses/\<id\>/alignment | coverage alignment + evidence |
-| GET | /api/districts | `[]` (no district records) |
-| GET | /api/districts/\<id\> | 404 + reason |
-| GET | /api/districts/\<id\>/skills | 404 + reason |
-| GET | /api/careers/roles | 4 roles with mappable requirements |
+| GET | /api/courses/\<id\>/alignment | engine score + provided reference pairs |
+| GET | /api/districts | 36 districts + centre counts |
+| GET | /api/districts/\<id\> | centres, capacity facts, recs, gaps, state indicators |
+| GET | /api/careers/roles | 32 roles (4 scorable via explicit links) |
 | POST | /api/careers/analyze, /api/career/analyze | role match, missing skills, courses, pathway |
 | GET | /api/employers/requirements | user submissions only (`observed`) |
 | POST | /api/employers/survey | validated insert (201) / 400 |
 | POST | /api/auth/login, /api/auth/logout; GET /api/auth/me | session auth |
-| POST | /api/ai/chat | Gemini answer or structured fallback (`ai_available` flag) |
+| POST | /api/ai/chat | `{answer, evidence[], data_source, grounded, ai_available, note}` |
 
-## Analytics methodology
+## 11. Analytics methodology (observed vs derived)
 
-- **Demand:** `overall = normalized_job_demand + normalized_growth_signal +
-  normalized_employer_evidence` (missing components omitted, never
-  zero-filled). All three inputs are currently empty → every skill reports
-  **Insufficient Evidence**; WEF trends shown as qualitative sector signals.
-- **Curriculum alignment (coverage):** role requirements text-matched from
-  NCO `related_skills` to catalog skills vs QP-taught skills;
-  `score = (adequate + 0.5·partial) / required × 100`.
-  QP-JSD = 87.5% (Technical Documentation needs deepening: Basic vs
-  Intermediate). Courses whose target roles are absent from the catalog
-  (QP-DEO, QP-GDA) are marked **Cannot assess**, never scored 0.
-- **Career matching:** token-containment skill match,
-  `match_score = |have ∩ required| / |required| × 100` (deterministic).
+- **Demand (INSUFFICIENT):** source `skill_demand` row is NULL for every
+  signal → `demand_score=null`, `demand_status='Insufficient data'`. Macro
+  aggregates are evidence only, never converted to skill scores.
+- **Curriculum alignment (DERIVED):** required = explicit NOS
+  `occupation_skills` of the best same-sector match (ratio, overlap, id);
+  `score = (adequate + 0.5·partial) / required × 100`. E.g. CRS001 vs
+  OCC013 = 8.3%; provided CRA reference pairs shown alongside. Cross-sector
+  pairings never scored; unmappable courses → `Cannot assess`.
+- **Proficiency:** observed surveys (deterministic majority, ties to lower
+  rank), else importance High→Advanced/Medium→Intermediate; curriculum
+  baseline Intermediate for Full coverage (documented convention).
+- **Career matching (DERIVED):** `match_score = |have ∩ required| /
+  |required| × 100`, deterministic; unmapped roles listed as unscored.
+- **District gaps (INSUFFICIENT):** demand unpublished → `capacity_gap=null`;
+  recorded centres/capacity shown as-is.
 - **Employer survey:** user submissions stored as `data_type='observed'`,
   never merged into source tables.
+- **Recommendations:** 3 provided derivations + deterministic engine rows
+  (`Collect data` for NULL-seat districts, `Map requirements` for unmapped
+  occupations), all `data_source=REAL`, engine rows flagged.
 
-## Dataset entities actually present (37 rows)
+## 4. Folder structure (relevant parts)
 
-4 job_roles (NCO 2015) · 9 skills (SSC NASSCOM/HSSC QPs) · 3 courses ·
-9 course_skills (derived hours) · 9 curriculum modules · 3 emerging trends
-(WEF). Empty by design: JOB_DEMAND, TRAINING_CAPACITY,
-PLACEMENT_OUTCOMES, EMPLOYER_REQUIREMENTS, DISTRICT_SKILL_DEMAND,
-SKILL_DEMAND_AGGREGATION, CURRICULUM_ALIGNMENT, DISTRICT_SKILL_GAPS,
-RECOMMENDATIONS. Known file quirks (SKILLS/TRAINING_COURSES/CURRICULUM
-headers omit `publication_date` while rows carry it) are handled and
-reported as warnings, never silently.
+`data/raw/csv/` (raw, never modified) · `data/processed/csv/` (cleaned +
+`data_quality_report.json`) · `scripts/{parse_csv_dataset,import_csv_data,init_db,restore_wef_trends}.py`
+(+ `archive/` retired) · `database/schema.sql` · `services/` · `routes/` ·
+`frontend/` · `tests/` · `DATA_{PIPELINE,DICTIONARY,SOURCES}.md`
 
 ## Testing
 
@@ -129,31 +172,45 @@ python tests/test_api.py            # full API/E2E incl. DB cross-checks (server
 All suites pass. Invalid-input cases verified: unknown ids → 404, empty
 skills → 400, bad survey fields → 400, bad login → 401, empty search → `[]`.
 
-## Kaushora AI Architecture
+## 12. Kaushora AI architecture
 
-`POST /api/ai/chat` → `ai_service.ask_ai(question, dashboard_overview())` → builds slim context `{top_skills,totals,actions}` → if `GEMINI_API_KEY` set, calls `generativelanguage.googleapis.com` with prompt `Use ONLY the numbers in CONTEXT. Never invent.` → returns `{answer,ai_available:true}` else `fallback_answer()` → structured evidence summary → `{answer,ai_available:false,note}`. AI outage never breaks dashboard; all non-AI features remain functional.
+`POST /api/ai/chat` → `ai_service.build_context()` retrieves live records
+(totals, weakest alignments, districts with centres, PLFS indicators,
+evidence metrics, recommendations, skill catalog, trends) → if
+`GEMINI_API_KEY` set, calls `generativelanguage.googleapis.com` with the
+system prompt *"Use only the provided Kaushora context… Do not invent…
+If insufficient, state so"* → `{answer, evidence[], data_source:REAL,
+grounded:true, ai_available:true}`; else deterministic `fallback_answer()`
+keyword-routed to the same live context → `{…, ai_available:false}`. AI
+outage never breaks dashboard; all non-AI features remain functional. The
+model never sees raw user data beyond the question and never fabricates —
+fallback cites NULL signals explicitly.
 
-## Limitations
+## 13. Limitations
 
-- Small catalog (37 rows): several NCO roles have no mappable requirements;
-  QP-DEO/QP-GDA target roles are absent from the role catalog.
-- No district/capacity/placement/employer source evidence → those endpoints
-  honestly report unavailability until real sources are ingested.
-- Skill-role text matching is token-based and approximate; unmapped phrases
-  are always reported in alignment responses.
+- Per-skill demand, district demand, placements, employer requirements:
+  unpublished in source → honest insufficient states (no estimates).
+- Explicit occupation-skill links cover 4/32 occupations → partial gap and
+  career coverage (28 roles unscored, stated).
+- Sparse capacity facts (3 rows, mostly NULL) → recorded as-is, gaps unavailable.
+- Skill sectors derived for 11/20 skills; 9 honestly unmapped.
 - No production hardening (single SQLite file, dev server, session auth).
 
-## Scalability Roadmap
+## 14. Scalability roadmap
 
-Replace SQLite→PostgreSQL (via `DATABASE_PATH` + SQLAlchemy), swap `parse_evidence_dataset.py` for live NCS/API pipelines, add Redis cache for `dashboard_overview`, move to Gunicorn + Nginx, add JWT auth, and ingest real district/placement feeds — frontend needs no rebuild (relative `/api/...`).
+Replace SQLite→PostgreSQL (via `DATABASE_PATH` + SQLAlchemy), add live
+PLFS/NCS/API pipelines beside the CSV importer, Redis cache for
+`dashboard_overview`, Gunicorn + Nginx, JWT auth, district/placement feeds
+as published — frontend needs no rebuild (relative `/api/...`).
 
-## Deployment
+## 15. Deployment instructions
 
-Same-origin deployment (Flask serves `frontend/` + `/api/*`) — no CORS, no `localhost` URLs. `frontend/js/api.js` uses relative `/api/...`.
+Same-origin deployment (Flask serves `frontend/` + `/api/*`) — no CORS, no
+`localhost` URLs. `frontend/js/api.js` uses relative `/api/...`.
 
 ```powershell
 # Local/dev (as tested)
-python scripts/init_db.py; python scripts/import_data.py; python scripts/seed_synthetic.py; python app.py
+python scripts/init_db.py; python scripts/import_csv_data.py; python scripts/restore_wef_trends.py; python app.py
 # Production (example)
 pip install -r requirements.txt
 $env:FLASK_DEBUG="false"; $env:GEMINI_API_KEY="..."; python app.py
@@ -162,6 +219,8 @@ $env:FLASK_DEBUG="false"; $env:GEMINI_API_KEY="..."; python app.py
 ```
 
 `.env` is git-ignored; `.env.example` documents required vars. No secrets in JS/HTML/README.
+Remaining deployment step: choose a host (Render/Railway/VM), set env vars,
+run the four commands above — nothing else is provider-specific.
 
 ## Frontend (Part 2) — premium UI, zero fake data
 
@@ -214,7 +273,7 @@ python app.py   # open http://127.0.0.1:5000
 app.py  requirements.txt  .env.example  README.md
 data/raw/kaushora_real_evidence_dataset.md
 database/schema.sql  database/kaushora.db (generated, git-ignored)
-scripts/parse_evidence_dataset.py  scripts/import_data.py  scripts/init_db.py
+scripts/{parse_csv_dataset,import_csv_data,init_db,restore_wef_trends}.py  (+ archive/ retired)
 services/db.py  services/data_service.py  services/analytics_service.py
 services/skill_gap_service.py  services/curriculum_service.py  services/ai_service.py
 routes/*_routes.py (health, data, skill, course, district, career, employer, ai)

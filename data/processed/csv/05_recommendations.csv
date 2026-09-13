@@ -1,0 +1,4 @@
+recommendation_id,district_id,skill_id,occupation_id,recommendation_type,recommendation_text,priority,reason,supporting_evidence,source_ids,is_derived
+REC001,DT019,SKL001,OCC025,Monitor demand,Monitor labour market demand for Electrician in Nagpur district,Medium,PLFS state-level data shows Maharashtra is a major economic centre but district-level PLFS estimates are not published,EV001,SRC001,TRUE
+REC002,DT001,SKL013,OCC016,Introduce a course,Consider introducing Graphic Design course in Ahilyanagar district,Low,PMKVY 4.0 training centre in Ahilyanagar offers Graphic Designer job role,EV006,SRC005,TRUE
+REC003,DT019,SKL010,OCC025,Update curriculum,Review Electrical safety module in Electrician curriculum,Medium,Ensure alignment with current NSDC standards for Electrician trade,EV001,SRC009,TRUE

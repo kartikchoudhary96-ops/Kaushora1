@@ -25,7 +25,7 @@ def main():
     conn.commit()
     conn.close()
     print(f"DB initialised at {DB}")
-    print("Next run: python scripts/import_data.py; python scripts/seed_synthetic.py")
+    print("Next run: python scripts/import_csv_data.py")
 
 
 if __name__ == "__main__":

@@ -35,7 +35,7 @@
           '<div class="field"><label for="dist">District</label><input id="dist" maxlength="80" placeholder="Optional" /></div>' +
           '<div class="field"><label for="diff">Hiring difficulty</label><select id="diff"><option>Easy</option><option selected>Medium</option><option>Hard</option></select></div></div>' +
           '<button class="btn" type="submit" id="go">Submit requirement</button> <span id="msg" style="font-size:13.5px"></span></form></div>' +
-          '<div class="card"><div class="eyebrow">Employer evidence</div><h3>Demo + community submissions</h3><p class="hint">Demo rows are synthetic; your new submissions are stored as observed evidence and remain distinguishable.</p><div id="subs"><div class="skel" style="height:180px"></div></div></div></div>';
+          '<div class="card"><div class="eyebrow">Employer evidence</div><h3>Community submissions</h3><p class="hint">The source dataset carries no employer requirements — everything below is user-submitted observed evidence, never merged into source tables.</p><div id="subs"><div class="skel" style="height:180px"></div></div></div></div>';
         document.getElementById("f").addEventListener("submit", submit);
         refreshSubs();
       }
@@ -75,7 +75,7 @@
             ? '<div class="table-wrap"><table class="data" style="min-width:0"><thead><tr><th>Organisation</th><th>Role</th><th>Skill</th><th>Imp.</th></tr></thead><tbody>' +
               rows.slice(0, 12).map((x) => "<tr><td><b>" + esc(x.employer_name) + "</b></td><td>" + esc(x.job_role) + "</td><td>" + esc(x.skill_name) + (x.skill_id ? ' <span class="pill tag-green">' + esc(x.skill_id) + "</span>" : "") + "</td><td>" + x.importance + "/5</td></tr>").join("") + "</tbody></table></div>"
             : window.KShell.emptyState("No submissions yet", "Be the first to contribute observed employer evidence.");
-        } catch (e) { el.innerHTML = window.KShell.errorState(e.message); }
+        } catch (e) { el.innerHTML = window.KShell.errorState(e.message, "retrySubs"); window.retrySubs = () => refreshSubs(); }
       }
       function esc(s) { return window.KShell.escapeHtml(s); }
       load();

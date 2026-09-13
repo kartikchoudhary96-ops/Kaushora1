@@ -1,0 +1,13 @@
+course_id,skill_id,coverage_level,skill_type,source_id
+CRS001,SKL001,Full,Core,SRC009
+CRS001,SKL010,Full,Compliance,SRC009
+CRS002,SKL001,Full,Core,SRC009
+CRS002,SKL008,Full,Technical,SRC009
+CRS003,SKL001,Full,Core,SRC009
+CRS003,SKL010,Full,Compliance,SRC009
+CRS004,SKL001,Full,Core,SRC009
+CRS004,SKL011,Full,Technical,SRC009
+CRS010,SKL001,Full,Core,SRC009
+CRS010,SKL010,Full,Compliance,SRC009
+CRS015,SKL001,Full,Core,SRC008
+CRS015,SKL012,Full,Technical,SRC008

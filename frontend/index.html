@@ -53,7 +53,7 @@
         <div class="hero-stats" id="heroStats" aria-live="polite">
           <div class="hs"><b><span class="skel" style="display:inline-block;width:52px;height:28px"></span></b><span>loading…</span></div>
         </div>
-        <div class="logo-strip">Grounded in NCO 2015 · SSC Qualification Packs · WEF Future of Jobs reports</div>
+        <div class="logo-strip">Grounded in PLFS · NSDC Qualification Packs · PMKVY Maharashtra · DVET ITIs · WEF reports</div>
       </div>
       <div class="hero-art"><img src="assets/hero-illustration.png" alt="Industry demand flowing through Kaushora into charts and trained people" onerror="this.onerror=null;this.src='assets/hero.svg'" /></div>
     </section>
@@ -88,7 +88,7 @@
     <section>
       <div class="eyebrow">Responsible data</div>
       <h2 class="section" style="margin-top:4px">No evidence, no number</h2>
-      <div class="card"><p style="margin:0">The catalog uses real public evidence (NCO, SSC Qualification Packs and WEF). To demonstrate every interactive feature, job demand, district capacity, placements and employer surveys use deterministic <b>synthetic demo data</b>, visibly marked <code>is_synthetic=1</code>. This keeps the demo complete without presenting generated values as real-world evidence.</p></div>
+      <div class="card"><p style="margin:0">Every figure on this site resolves to a public record (PLFS, NSDC, PMKVY, DVET, DGT, WEF) marked <code>data_source=REAL</code>, or to a Kaushora derivation marked <b>Derived by Kaushora</b> with its formula shown. Where the source publishes nothing — per-skill demand, district training demand, placements — the page says <b>Insufficient data</b> instead of estimating.</p></div>
     </section>
 
     <footer class="footer">
@@ -119,19 +119,19 @@
           const [ds, ov] = await Promise.all([window.KaushoraAPI.dataStatus(), window.KaushoraAPI.overview()]);
           const c = ds.record_counts, t = ov.totals;
           document.getElementById("heroStats").innerHTML =
-            stat(c.skills, "skills catalogued") + stat(c.courses, "QP courses") +
-            stat(c.job_roles, "NCO job roles") + stat(c.trends, "trend signals") +
+            stat(c.skills, "skills catalogued") + stat(c.courses, "ITI courses") +
+            stat(c.job_roles, "NSDC occupations") + stat(c.districts, "MH districts") +
             stat(t.avg_alignment == null ? "—" : t.avg_alignment + "%", "avg. alignment");
           document.getElementById("footSrc").textContent =
-            "Source: Real Evidence Dataset · ingested " + (ds.last_ingestion ? ds.last_ingestion.started_at.slice(0, 10) : "unknown");
-          const assessed = t.avg_alignment == null ? "Only courses with mappable roles can be scored." :
+            "Source: Kaushora public dataset (PLFS/NSDC/MSDE/DGT/DVET) · ingested " + (ds.last_ingestion ? ds.last_ingestion.started_at.slice(0, 10) : "unknown");
+          const assessed = t.avg_alignment == null ? "Only courses with same-sector explicit requirements can be scored." :
             "Average coverage alignment " + t.avg_alignment + "% across assessable courses.";
           document.getElementById("snapshot").innerHTML =
-            '<div class="card"><div class="eyebrow">Catalog</div><h3>' + c.skills + " skills · " + c.courses +
-            " courses · " + c.job_roles + ' roles</h3><p class="hint">National real-source catalog (NCO 2015, SSC Qualification Packs) plus clearly labelled Maharashtra synthetic demo records.</p>' +
+            '<div class="card"><div class="eyebrow">Catalog (source data)</div><h3>' + c.skills + " skills · " + c.courses +
+            " courses · " + c.job_roles + ' occupations</h3><p class="hint">Maharashtra-focused registry: 36 districts, 8 recorded training centres, 15 PLFS indicators, 10 evidence metrics.</p>' +
             '<a class="btn ghost sm" href="skills.html">Browse the catalog ' + window.KIcon("arrow") + "</a></div>" +
-            '<div class="card"><div class="eyebrow">Alignment</div><h3>Curriculum vs industry requirements</h3><p class="hint">' +
-            assessed + " QP-DEO and QP-GDA target roles outside the role catalog, so assessment is withheld rather than scored zero.</p>" +
+            '<div class="card"><div class="eyebrow">Alignment (derived by Kaushora)</div><h3>Curriculum vs industry requirements</h3><p class="hint">' +
+            assessed + " Courses without same-sector explicit requirements show Cannot assess rather than a fabricated score.</p>" +
             '<a class="btn ghost sm" href="courses.html">Inspect alignment ' + window.KIcon("arrow") + "</a></div>";
         } catch (e) {
           document.getElementById("heroStats").innerHTML =

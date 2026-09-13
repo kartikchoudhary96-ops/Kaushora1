@@ -1,0 +1,37 @@
+district_id,district_code,district_name,state_id,state_name,source_id
+DT001,27-01,Ahilyanagar (Ahmednagar),ST001,Maharashtra,SRC005
+DT002,27-02,Akola,ST001,Maharashtra,SRC005
+DT003,27-03,Amravati,ST001,Maharashtra,SRC005
+DT004,27-04,Aurangabad (Chhatrapati Sambhajinagar),ST001,Maharashtra,SRC005
+DT005,27-05,Beed,ST001,Maharashtra,SRC005
+DT006,27-06,Bhandara,ST001,Maharashtra,SRC005
+DT007,27-07,Buldhana,ST001,Maharashtra,SRC005
+DT008,27-08,Chandrapur,ST001,Maharashtra,SRC005
+DT009,27-09,Dhule,ST001,Maharashtra,SRC005
+DT010,27-10,Gadchiroli,ST001,Maharashtra,SRC005
+DT011,27-11,Gondia,ST001,Maharashtra,SRC005
+DT012,27-12,Hingoli,ST001,Maharashtra,SRC005
+DT013,27-13,Jalgaon,ST001,Maharashtra,SRC005
+DT014,27-14,Jalna,ST001,Maharashtra,SRC005
+DT015,27-15,Kolhapur,ST001,Maharashtra,SRC005
+DT016,27-16,Latur,ST001,Maharashtra,SRC005
+DT017,27-17,Mumbai City,ST001,Maharashtra,SRC005
+DT018,27-18,Mumbai Suburban,ST001,Maharashtra,SRC005
+DT019,27-19,Nagpur,ST001,Maharashtra,SRC005
+DT020,27-20,Nanded,ST001,Maharashtra,SRC005
+DT021,27-21,Nandurbar,ST001,Maharashtra,SRC005
+DT022,27-22,Nashik,ST001,Maharashtra,SRC005
+DT023,27-23,Osmanabad (Dharashiv),ST001,Maharashtra,SRC005
+DT024,27-24,Parbhani,ST001,Maharashtra,SRC005
+DT025,27-25,Pune,ST001,Maharashtra,SRC005
+DT026,27-26,Raigad,ST001,Maharashtra,SRC005
+DT027,27-27,Ratnagiri,ST001,Maharashtra,SRC005
+DT028,27-28,Sangli,ST001,Maharashtra,SRC005
+DT029,27-29,Satara,ST001,Maharashtra,SRC005
+DT030,27-30,Sindhudurg,ST001,Maharashtra,SRC005
+DT031,27-31,Solapur,ST001,Maharashtra,SRC005
+DT032,27-32,Thane,ST001,Maharashtra,SRC005
+DT033,27-33,Wardha,ST001,Maharashtra,SRC005
+DT034,27-34,Washim,ST001,Maharashtra,SRC005
+DT035,27-35,Yavatmal,ST001,Maharashtra,SRC005
+DT036,27-36,Palghar,ST001,Maharashtra,SRC005

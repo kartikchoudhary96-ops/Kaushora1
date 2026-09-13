@@ -54,7 +54,7 @@
       "</div>" +
       '<div class="page" id="page"></div>' +
       '<div class="page" style="padding-top:0"><div class="evidence-strip" style="opacity:0.9;font-size:12.5px">' + window.KIcon("shield") +
-      "<div><b>Kaushora Dataset:</b> Real evidence (NCO 2015, SSC QPs, WEF) + <b>synthetic demo</b> (180 jobs, 4 districts, 24 placements) for feature completeness — all metrics live from backend (<code>/api/…</code>), synthetic rows <code>is_synthetic=1</code>.</div></div></div>" +
+      "<div><b>Kaushora public dataset</b> (PLFS/NSDC/PMKVY/DVET/DGT/WEF) — all metrics live from backend (<code>/api/…</code>). Rows marked <code>data_source=REAL</code>; calculations marked <b>Derived by Kaushora</b>; gaps marked <b>Insufficient data</b>, never estimated.</div></div></div>" +
       "</div>";
     document.getElementById("scrim").addEventListener("click", () => document.body.classList.remove("nav-open"));
     document.getElementById("hamburger").addEventListener("click", () => document.body.classList.toggle("nav-open"));

@@ -1,0 +1,3 @@
+state_id,state_code,state_name,source_id
+ST001,27,Maharashtra,SRC007
+ST002,00,All India,SRC001

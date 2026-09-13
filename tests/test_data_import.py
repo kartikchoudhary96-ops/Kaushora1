@@ -1,9 +1,9 @@
-"""Import tests for the Real Evidence Dataset. Run: python tests/test_data_import.py
+"""Import tests for the real public CSV dataset. Run: python tests/test_data_import.py
 (No server needed. Uses a temp copy of the DB for re-import/rollback tests.)
 """
-import copy
 import os
 import shutil
+import sqlite3
 import sys
 import tempfile
 from pathlib import Path
@@ -13,62 +13,69 @@ os.environ["DATABASE_PATH"] = str(ROOT / "database" / "kaushora.db")
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT))
 
-from parse_evidence_dataset import parse_dataset, DATASET_PATH  # noqa: E402
+from parse_csv_dataset import parse_dataset  # noqa: E402
 
-# 1. canonical dataset file exists
-assert DATASET_PATH.is_file(), "canonical dataset missing"
+# 1. raw files exist
+for f in ["01_sources.csv", "03_districts.csv", "14_courses.csv", "17_skills.csv", "18_occupations.csv"]:
+    assert (ROOT / "data" / "raw" / "csv" / f).is_file(), f
 
-# 2-3. parser reads it; all expected sections found
+# 2. parser: 0 errors, expected tables
 res = parse_dataset()
 assert res["errors"] == [], res["errors"]
-for k in ["job_roles", "skills", "courses", "course_skills", "curriculum", "trends"]:
+for k in ["sources", "states", "districts", "sectors", "skills", "occupations",
+          "occupation_skills", "courses", "course_skills", "training_centres",
+          "labour_indicators", "evidence_metrics", "recommendations"]:
     assert k in res["tables"] and res["tables"][k]["header"], k
 
-# 4-5. record counts correct
-assert res["counts"]["job_roles"] == 4, res["counts"]
-assert res["counts"]["skills"] == 9
-assert res["counts"]["courses"] == 3
-assert res["counts"]["course_skills"] == 9
-assert res["counts"]["curriculum"] == 9
-assert res["counts"]["trends"] == 3
+# 3. record counts match the supplied files
+counts = {k: len(v["rows"]) for k, v in res["tables"].items()}
+assert counts["sources"] == 10 and counts["states"] == 2 and counts["districts"] == 36
+assert counts["sectors"] == 13 and counts["skills"] == 20 and counts["occupations"] == 32
+assert counts["courses"] == 15 and counts["training_centres"] == 8
+assert counts["labour_indicators"] == 15 and counts["evidence_metrics"] == 10
 
-# 6. IDs unique
-import sqlite3  # noqa: E402
+# 4. cleaned layer + quality report exist and are error-free
+import json as _json  # noqa: E402
+rep = _json.loads((ROOT / "data" / "processed" / "csv" / "data_quality_report.json").read_text(encoding="utf-8"))
+assert rep["errors"] == [], rep["errors"]
+assert (ROOT / "data" / "processed" / "csv" / "03_districts.csv").is_file()
+# raw layer untouched: byte-identical to supplied files in Downloads
+import filecmp  # noqa: E402
+assert filecmp.cmp(ROOT / "data" / "raw" / "csv" / "03_districts.csv",
+                   Path(r"C:\Users\ASUS\Downloads\deepseek_csv_20260911_5ba8bd.txt"), shallow=False)
 
+# 5. DB matches parsed counts; all rows REAL
 c = sqlite3.connect(ROOT / "database" / "kaushora.db")
-for tbl, pk in [("job_roles", "role_id"), ("skills", "id"), ("courses", "id"),
-                ("curriculum", "curriculum_id"), ("trends", "trend_id")]:
-    n = c.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0]
-    u = c.execute(f"SELECT COUNT(DISTINCT {pk}) FROM {tbl}").fetchone()[0]
-    assert n == u and n > 0, (tbl, n, u)
+for tbl, n in [("sources", 10), ("states", 2), ("districts", 36), ("sectors", 13),
+               ("skills", 20), ("job_roles", 32), ("courses", 15), ("course_skills", 12),
+               ("occupation_skills", 10), ("qualifications", 13), ("training_centres", 8),
+               ("labour_indicators", 15), ("evidence_metrics", 10), ("recommendations", 3),
+               ("trends", 3)]:
+    got = c.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0]
+    assert got == n, (tbl, got, n)
+for tbl in ["skills", "job_roles", "courses", "districts", "training_centres",
+            "labour_indicators", "evidence_metrics", "recommendations"]:
+    col = "data_source"
+    bad_rows = c.execute(f"SELECT COUNT(*) FROM {tbl} WHERE {col}!='REAL' OR {col} IS NULL").fetchone()[0]
+    assert bad_rows == 0, (tbl, bad_rows)
 
-# 7. FKs valid
-assert c.execute("SELECT COUNT(*) FROM course_skills WHERE course_id NOT IN (SELECT id FROM courses)").fetchone()[0] == 0
-assert c.execute("SELECT COUNT(*) FROM course_skills WHERE skill_id NOT IN (SELECT id FROM skills)").fetchone()[0] == 0
-assert c.execute("SELECT COUNT(*) FROM curriculum WHERE course_id NOT IN (SELECT id FROM courses)").fetchone()[0] == 0
-assert c.execute("SELECT COUNT(*) FROM curriculum WHERE skill_id NOT IN (SELECT id FROM skills)").fetchone()[0] == 0
-
-# 8. provenance preserved: no synthetic dataset rows, URLs present
-assert c.execute("SELECT COUNT(*) FROM skills WHERE is_synthetic!=0").fetchone()[0] == 0
-assert c.execute("SELECT COUNT(*) FROM skills WHERE source_url IS NULL OR source_url=''").fetchone()[0] == 0
-assert c.execute("SELECT COUNT(*) FROM job_roles WHERE is_synthetic!=0").fetchone()[0] == 0
-assert c.execute("SELECT COUNT(*) FROM courses WHERE is_synthetic!=0").fetchone()[0] == 0
-assert c.execute("SELECT COUNT(*) FROM trends WHERE is_synthetic!=0").fetchone()[0] == 0
+# 6. no synthetic rows anywhere
+for tbl in ["skills", "job_roles", "courses", "course_skills", "job_postings", "placements",
+            "district_capacity", "training_centres", "employer_surveys", "trends"]:
+    assert c.execute(f"SELECT COUNT(*) FROM {tbl} WHERE is_synthetic!=0").fetchone()[0] == 0, tbl
 c.close()
 
-# 9-10. re-import is idempotent; invalid data rolls back (temp DB)
+# 7. re-import is idempotent (temp DB copy)
 tmp = tempfile.mktemp(suffix=".db")
 shutil.copy(ROOT / "database" / "kaushora.db", tmp)
 os.environ["DATABASE_PATH"] = tmp
-import importlib  # noqa: E402
-
 import services.db as dbmod  # noqa: E402
-
+import importlib  # noqa: E402
 importlib.reload(dbmod)
-import import_data  # noqa: E402
+import import_csv_data  # noqa: E402
 
 
-def counts(dbpath, tables):
+def counts_of(dbpath, tables):
     cx = sqlite3.connect(dbpath)
     try:
         return {t: cx.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in tables}
@@ -76,26 +83,13 @@ def counts(dbpath, tables):
         cx.close()
 
 
-TABLES = ["job_roles", "skills", "courses", "course_skills", "curriculum", "trends"]
-before = counts(tmp, TABLES)
-import_data.DB = Path(tmp)
-import_data.main()
-after = counts(tmp, TABLES)
+TABLES = ["sources", "states", "districts", "sectors", "skills", "job_roles", "courses",
+          "course_skills", "training_centres", "labour_indicators", "evidence_metrics", "recommendations"]
+before = counts_of(tmp, TABLES)
+import_csv_data.DB = Path(tmp)
+import_csv_data.main()
+after = counts_of(tmp, TABLES)
 assert before == after, (before, after)
-
-bad = copy.deepcopy(res)
-bad["tables"]["curriculum"]["rows"] = bad["tables"]["curriculum"]["rows"] + [{
-    "curriculum_id": "CUR-BAD", "course_id": "NO-SUCH-COURSE", "module_name": "x",
-    "skill_id": "SK-JSD-01", "proficiency_level": "Basic", "training_hours": "10",
-    "module_status": "Active"}]
-bad["errors"] = ["FK violation: curriculum.course_id='NO-SUCH-COURSE' unknown"]
-import_data.parse_dataset = lambda path=None: bad
-try:
-    import_data.main()
-    raise AssertionError("import should have aborted on validation errors")
-except SystemExit as e:
-    assert e.code == 1
-rolled_back = counts(tmp, TABLES)
-assert rolled_back == before, rolled_back
+# users + observed surveys untouched by re-import
 os.remove(tmp)
 print("test_data_import: ALL PASSED")

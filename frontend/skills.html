@@ -18,7 +18,8 @@
       let all = [], sectors = [];
 
       function statusPill(s) {
-        return s === "Insufficient Evidence" ? '<span class="pill tag-grey">Insufficient Evidence</span>' : '<span class="pill tag-green">' + esc(s) + "</span>";
+        if (s === "Insufficient data") return '<span class="pill tag-grey">Insufficient data</span>';
+        return '<span class="pill tag-green">' + esc(s) + "</span>";
       }
 
       async function load() {
@@ -41,20 +42,20 @@
       function renderShell() {
         const statuses = [...new Set(all.map((s) => s.demand_status))];
         page.innerHTML =
-          '<div class="eyebrow">Ontology &amp; Intelligence · ' + all.length + ' skills live</div>' +
+          '<div class="eyebrow">Skill registry · ' + all.length + ' real skills (SKL001–020)</div>' +
           '<h1 class="title">Skill Intelligence</h1>' +
-          '<p class="subtitle">Live labour-market demand signals, cross-role versatility and curriculum alignment across catalogued skills.</p>' +
+          '<p class="subtitle">NSDC skill records with explicit NOS occupation links and ITI course coverage. Per-skill demand is unavailable in the source — shown honestly, never estimated.</p>' +
           '<div class="card"><div class="grid cols-3" style="align-items:end">' +
           '<div class="field" style="margin:0"><label for="q">Search skills</label><div class="searchbar">' + window.KIcon("search") +
-          '<input id="q" type="search" placeholder="e.g. Programming, Patient Care…" aria-label="Search skills" /></div></div>' +
+          '<input id="q" type="search" placeholder="e.g. Communication, Data Entry, Plumbing…" aria-label="Search skills" /></div></div>' +
           '<div class="field" style="margin:0"><label for="fSector">Economic sector</label><select id="fSector" class="inline-filter" style="width:100%;padding:10px 13px">' +
           '<option value="">All sectors</option>' + sectors.map((s) => '<option value="' + esc(s.sector_name) + '">' + esc(s.sector_name) + "</option>").join("") + "</select></div>" +
           '<div class="field" style="margin:0"><label for="fStatus">Demand status</label><select id="fStatus" class="inline-filter" style="width:100%;padding:10px 13px">' +
           '<option value="">All statuses</option>' + statuses.map((s) => '<option>' + esc(s) + "</option>").join("") + "</select></div>" +
-          '</div><p class="hint" style="margin:10px 0 0">Demand scores use deterministic synthetic job-posting and employer-survey records. Status filters reflect live backend values only.</p></div>' +
-          '<h2 class="section">Priority Skill Profiles</h2>' +
+          '</div><p class="hint" style="margin:10px 0 0">Sector options come from the live registry; skills without a mapped sector show as unmapped (no mapping invented). Demand-velocity filtering is unavailable — no time-series demand in source.</p></div>' +
+          '<h2 class="section">Skill Profiles</h2>' +
           '<p class="section-sub" id="countLine"></p><div id="tbl"></div>' +
-          '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Methodology.</b> Demo demand score = 60% normalized job-posting frequency + 40% normalized employer hiring demand. Both inputs are deterministic synthetic demo data and are marked <code>is_synthetic=1</code>.</div></div>";
+          '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Methodology.</b> The source skill_demand assessment is NULL for every signal, so demand scores are honestly unavailable. Related roles come from explicit NOS-coded occupation links; taught-by from recorded course-skill links. All rows: <code>data_source=REAL</code>.</div></div>";
         document.getElementById("q").addEventListener("input", applyFilters);
         document.getElementById("fSector").addEventListener("change", applyFilters);
         document.getElementById("fStatus").addEventListener("change", applyFilters);

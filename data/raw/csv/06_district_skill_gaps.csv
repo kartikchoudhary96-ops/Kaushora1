@@ -1,0 +1,2 @@
+gap_id,district_id,skill_id,demand_signal,training_supply_signal,gap_score,gap_status,evidence_sources,calculation_method,is_derived
+GSG001,DT019,SKL001,NULL,Present,NULL,Unavailable,SRC009,Not calculated - demand signal missing,TRUE

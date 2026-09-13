@@ -1,0 +1,2 @@
+skill_demand_id,skill_id,geography,time_period,employment_signal,occupation_signal,training_gap_signal,growth_signal,demand_score,demand_status,calculation_method,source_ids,is_derived
+DSD001,SKL001,India,2025,NULL,NULL,NULL,NULL,NULL,Unavailable,Not calculated - insufficient signals,SRC001,TRUE

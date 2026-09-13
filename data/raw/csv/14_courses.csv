@@ -1,0 +1,16 @@
+course_id,course_name,provider_name,course_code,sector_id,nsqf_level,course_status,duration,source_id
+CRS001,Electrician (NSQF),Government ITI Saoner,CTS-ELE-2Y,SEC011,4,Active,2 Years,SRC009
+CRS002,Electronics Mechanic (NSQF),Government ITI Saoner,CTS-ELE-MECH-2Y,SEC011,4,Active,2 Years,SRC009
+CRS003,Fitter (NSQF),Government ITI Saoner,CTS-FIT-2Y,SEC012,4,Active,2 Years,SRC009
+CRS004,Information and Communication Technology System Maintenance (NSQF),Government ITI Saoner,CTS-ICTSM-2Y,SEC005,4,Active,2 Years,SRC009
+CRS005,Mechanic Diesel (NSQF),Government ITI Saoner,CTS-MEC-D-1Y,SEC012,3,Active,1 Year,SRC009
+CRS006,Mechanic Motor Vehicle (NSQF),Government ITI Saoner,CTS-MMV-2Y,SEC012,4,Active,2 Years,SRC009
+CRS007,Pump Operator cum Mechanic (NSQF),Government ITI Saoner,CTS-POM-1Y,SEC011,3,Active,1 Year,SRC009
+CRS008,Refrigeration and Air Conditioner Technician (NSQF),Government ITI Saoner,CTS-RAC-2Y,SEC011,4,Active,2 Years,SRC009
+CRS009,Welder (NSQF),Government ITI Saoner,CTS-WLD-1Y,SEC012,3,Active,1 Year,SRC009
+CRS010,Solar Technician (NSQF),Government ITI Saoner,CTS-STE-1Y,SEC011,3,Active,1 Year,SRC009
+CRS011,Additive Manufacturing Technician (3D Printing),Government ITI Mumbai,CTS-AMT-1Y,SEC012,3,Active,1 Year,SRC008
+CRS012,Solar Technician (Electrical),Government ITI Mumbai,CTS-STE-E-1Y,SEC011,3,Active,1 Year,SRC008
+CRS013,Internet of Things (Smart Health Care),Government ITI Mumbai,CTS-IOT-1Y,SEC005,3,Active,1 Year,SRC008
+CRS014,Computer Operator and Programming Assistant (COPA),Government ITI Mumbai,CTS-COPA-1Y,SEC005,3,Active,1 Year,SRC008
+CRS015,Artificial Intelligence Programming Assistant,Government ITI Mumbai,CTS-AI-1Y,SEC005,3.5,Active,1 Year,SRC008

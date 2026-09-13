@@ -40,31 +40,31 @@
           "<h1 class='title'>" + esc(d.skill_name) + "</h1>" +
           '<p class="subtitle">' + esc(d.description || "") + ' <span class="pill tag-grey">' + esc(d.demand_status) + "</span></p>" +
           '<div class="grid cols-3">' +
-          '<div class="card kpi"><div class="k-label">Demand score</div><div class="k-value">' + (demand.demand_score == null ? "—" : demand.demand_score) + '</div><div class="k-sub">Synthetic demo demand signal</div><span class="k-tag tag-amber">' + esc(demand.demand_status) + '</span></div>' +
+          '<div class="card kpi"><div class="k-label">Demand score</div><div class="k-value">' + (demand.demand_score == null ? "—" : demand.demand_score) + '</div><div class="k-sub">Unavailable — no demand signals published</div><span class="k-tag tag-grey">' + esc(demand.demand_status) + '</span></div>' +
           '<div class="card kpi"><div class="k-label">Gap severity</div><div class="k-value" style="font-size:22px;padding:6px 0">' + esc(gap.gap_severity) + '</div><div class="k-sub">' + esc(gap.gap_status) + '</div><span class="k-tag ' + (gap.gap_severity === "High" ? "tag-red" : gap.gap_severity === "Low" ? "tag-green" : "tag-grey") + '">' + esc(gap.gap_status) + "</span></div>" +
-          '<div class="card kpi"><div class="k-label">Technology status</div><div class="k-value" style="font-size:22px;padding:6px 0">' + esc(d.technology_status || "—") + '</div><div class="k-sub">Per active Qualification Pack</div><span class="k-tag tag-green">Current catalog</span></div></div>';
+          '<div class="card kpi"><div class="k-label">Skill category</div><div class="k-value" style="font-size:22px;padding:6px 0">' + esc(d.category || "—") + '</div><div class="k-sub">NSDC skill classification</div><span class="k-tag tag-green">Source data</span></div></div>';
 
         h += '<div class="grid cols-2" style="margin-top:16px"><div class="card"><div class="eyebrow">Skill gap bridge</div><h3>Requirement vs coverage</h3>' +
           "<p class='hint'>Roles requiring this skill: <b>" + gap.required_by_roles.length + "</b> · Courses teaching it: <b>" + gap.taught_by_courses.length + "</b></p>" +
           '<div class="chart-box sm"><canvas id="chGap"></canvas></div>' +
           '<p class="hint">' + esc(gap.methodology) + "</p></div>" +
-          '<div class="card"><div class="eyebrow">Demand methodology</div><h3>How this score is calculated</h3><p class="hint">' + esc(demand.methodology) + "</p>" +
+          '<div class="card"><div class="eyebrow">Demand methodology</div><h3>Why no score?</h3><p class="hint">' + esc(demand.methodology) + "</p>" +
           '<div class="meter" style="margin:8px 0"><i style="width:' + Math.max(0, Math.min(100, demand.demand_score || 0)) + '%"></i></div>' +
-          '<p class="hint">Job records citing this skill: <b>' + d.demand_count + "</b> · Employer citations: <b>" + (d.employer_demand || 0) + "</b></p></div></div>";
+          '<p class="hint">Job records citing this skill: <b>' + d.demand_count + "</b> · Employer citations: <b>" + (d.employer_demand || 0) + "</b> · Source assessment: <b>" + esc((d.demand_assessment || {}).demand_status || "Unavailable") + "</b></p></div></div>";
 
-        h += '<h2 class="section">Evidence</h2><p class="section-sub">Catalog evidence is sourced; demand evidence is clearly labelled synthetic demo data.</p><div class="grid cols-2">';
-        h += evCard("Related roles", (d.evidence_roles || []).map((r) => "<b>" + esc(r.role_id) + "</b> — " + esc(r.job_title)));
+        h += '<h2 class="section">Evidence</h2><p class="section-sub">Every claim below resolves to a real record (<code>data_source=REAL</code>).</p><div class="grid cols-2">';
+        h += evCard("Related occupations", (d.evidence_roles || []).map((r) => "<b>" + esc(r.role_id) + "</b> — " + esc(r.job_title) + (r.importance ? " <span class='pill tag-blue'>" + esc(r.importance) + "</span>" : "")));
         h += evCard("Teaching courses", (d.evidence_courses || []).map((c) => '<a href="course-detail.html?id=' + encodeURIComponent(c.id) + '"><b>' + esc(c.id) + "</b> — " + esc(c.course_name) + "</a>"));
         h += "</div><div class='grid cols-2' style='margin-top:16px'>";
-        h += evCard("Citing job records (" + (d.evidence_jobs || []).length + ")", (d.evidence_jobs || []).map((j) => esc(j.job_title)), "No demo job-posting records cite this skill.");
-        h += evCard("Employer citations (" + (d.evidence_employers || []).length + ")", (d.evidence_employers || []).map((e) => esc(e.employer_name)), "No employer records cite this skill yet.");
+        h += evCard("Citing job records (" + (d.evidence_jobs || []).length + ")", (d.evidence_jobs || []).map((j) => esc(j.job_title)), "No vacancy microdata in the source dataset.");
+        h += evCard("Employer citations (" + (d.evidence_employers || []).length + ")", (d.evidence_employers || []).map((e) => esc(e.employer_name)), "No source employer requirements — the source table is empty; user submissions would appear here once validated.");
         h += "</div>";
 
         const p = d.provenance || {};
-        h += '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Provenance.</b> " + esc(p.source || "") +
+        h += '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Provenance (source data).</b> " + esc(p.source || "") +
           " · " + esc(p.publisher || "") + " · period " + esc(p.data_period || "") +
           (p.source_url ? ' · <a href="' + esc(p.source_url) + '" target="_blank" rel="noopener">source link</a>' : "") +
-          ' · <code>is_synthetic=' + p.is_synthetic + "</code></div></div>";
+          ' · <code>data_source=' + esc(p.data_source || "REAL") + "</code></div></div>";
         page.innerHTML = h;
         if (typeof Chart !== "undefined") {
           new Chart(document.getElementById("chGap"), {

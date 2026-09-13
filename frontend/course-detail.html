@@ -37,12 +37,11 @@
         let h = '<a href="courses.html" class="btn ghost sm">← All courses</a>' +
           '<div class="eyebrow" style="margin-top:14px">' + esc(c.sector || "") + " · " + esc(c.qualification_level || "") + " · " + esc(c.duration || "") + "</div>" +
           "<h1 class='title'>" + esc(c.course_name) + "</h1>" +
-          '<p class="subtitle">' + esc(c.provider || "") + " · " + esc(c.delivery_mode || "") + " · Targets: " + esc(c.target_roles || "—") + "</p>";
+          '<p class="subtitle">' + esc(c.provider || "") + (c.course_code ? " · <code>" + esc(c.course_code) + "</code>" : "") + " · " + esc(c.duration || "") + "</p>";
 
         if (a.alignment_score == null) {
-          h += '<div class="empty">' + window.KIcon("doc") + "<h3>Alignment cannot be assessed</h3><p>" + esc(a.methodology) +
-            ". Stated target roles (" + esc((a.unmapped_role_phrases || []).join(", ")) + ") are absent from the " +
-            "4-row NCO role catalog, so scoring would fabricate a signal. The curriculum record itself remains inspectable on the Courses page.</p></div>";
+          h += '<div class="empty">' + window.KIcon("doc") + "<h3>Alignment cannot be assessed</h3><p>" + esc(a.methodology) + ".</p>" +
+            refHtml(a) + "</div>";
           page.innerHTML = h;
           return;
         }
@@ -61,10 +60,10 @@
           (recs.length ? "<ul style='margin:8px 0 0;padding-left:20px'>" + recs.map((r) => "<li style='margin:6px 0'>" + esc(r) + "</li>").join("") + "</ul>"
             : '<p class="hint">No additions required by the current evidence.</p>') + "</div>";
 
+        h += '<div class="card" style="margin-top:16px"><h3>Provided reference assessment</h3>' + refHtml(a) + "</div>";
+
         h += '<div class="card" style="margin-top:16px"><h3>Match basis &amp; honesty log</h3>' +
-          '<p class="hint">Matched roles: <b>' + esc((a.matched_roles || []).join(", ") || "—") + "</b></p>" +
-          '<p class="hint">Unmapped requirement phrases (reported, never forced): <b>' + esc((a.unmapped_requirement_phrases || []).join(", ") || "none") + "</b></p>" +
-          '<p class="hint">Unmapped target phrases: <b>' + esc((a.unmapped_role_phrases || []).join(", ") || "none") + "</b></p>" +
+          '<p class="hint">Engine matched occupation: <b>' + esc((a.matched_roles || []).join(", ") || "—") + "</b> (same-sector explicit NOS requirements only)</p>" +
           '<p class="hint">' + esc(a.methodology) + " · Source: " + esc((a.evidence || {}).source || "") + "</p></div>";
 
         page.innerHTML = h;
@@ -75,6 +74,17 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } }
           });
         }
+      }
+
+      function refHtml(a) {
+        const refs = a.reference_pairs || [];
+        if (!refs.length) return '<p class="hint">No provided reference assessment for this course.</p>';
+        return '<div class="table-wrap"><table class="data" style="min-width:0"><thead><tr><th>Occupation</th><th>Required</th><th>Covered</th><th>Score</th></tr></thead><tbody>' +
+          refs.map(function (r) {
+            return "<tr><td><b>" + esc(r.occupation_id || "") + "</b></td><td>" + (r.required_skill_count == null ? "—" : r.required_skill_count) +
+              "</td><td>" + (r.covered_skill_count == null ? "—" : r.covered_skill_count) + "</td><td><b>" +
+              (r.alignment_score == null ? "—" : r.alignment_score + "%") + "</b> <span class='pill tag-blue'>Provided reference</span></td></tr>";
+          }).join("") + "</tbody></table></div><p class='hint'>Observed reference rows from the source file (derived by compiler), shown alongside the independent engine score above.</p>";
       }
 
       function skillList(items, label) {

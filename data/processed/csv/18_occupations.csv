@@ -1,0 +1,33 @@
+occupation_id,occupation_name,occupation_code,sector_id,nsqf_level,qp_code,qp_name,standard_status,source_id
+OCC001,Gardener,AGR/Q0801,SEC001,4,AGR/Q0801,Gardener,Active,SRC003
+OCC002,Hand Embroiderer,AMH/Q1001,SEC002,4,AMH/Q1001,Hand Embroiderer,Active,SRC003
+OCC003,Inline Checker,AMH/Q0102,SEC002,3,AMH/Q0102,Inline Checker,Active,SRC003
+OCC004,Packer,AMH/Q1407,SEC002,3,AMH/Q1407,Packer,Active,SRC003
+OCC005,Pressman,AMH/Q0401,SEC002,4,AMH/Q0401,Pressman,Active,SRC003
+OCC006,Self Employed Tailor,AMH/Q1947,SEC002,4,AMH/Q1947,Self Employed Tailor,Active,SRC003
+OCC007,Sewing Machine Operator,AMH/Q0301,SEC002,4,AMH/Q0301,Sewing Machine Operator,Active,SRC003
+OCC008,Pedicurist and Manicurist,BWS/Q0402,SEC003,3,BWS/Q0402,Pedicurist and Manicurist,Active,SRC003
+OCC009,Assistant Hair Stylist,BWS/Q0201,SEC003,3,BWS/Q0201,Assistant Hair Stylist,Active,SRC003
+OCC010,Hair Stylist,BWS/Q0202,SEC003,4,BWS/Q0202,Hair Stylist,Active,SRC003
+OCC011,Assistant Beauty Therapist,BWS/Q0101,SEC003,3,BWS/Q0101,Assistant Beauty Therapist,Active,SRC003
+OCC012,Beauty Therapist,BWS/Q0102,SEC003,4,BWS/Q0102,Beauty Therapist,Active,SRC003
+OCC013,Field Technician – Washing Machine,ELE/Q3106,SEC011,4,ELE/Q3106,Field Technician – Washing Machine,Active,SRC004
+OCC014,Domestic Data Entry Operator,SSC/Q2212,SEC005,3,SSC/Q2212,Domestic Data Entry Operator,Active,SRC005
+OCC015,Web Developer,SSC/Q8104,SEC005,4,SSC/Q8104,Web Developer,Active,SRC005
+OCC016,Graphic Designer,MES/Q0701,SEC008,3,MES/Q0701,Graphic Designer,Active,SRC005
+OCC017,Guest Service Associate (Food & Beverage),THC/Q0307,SEC009,3,THC/Q0307,Guest Service Associate (Food & Beverage),Active,SRC005
+OCC018,Claims Coordinator – Warehouse,LSC/Q0401,SEC006,3,LSC/Q0401,Claims Coordinator – Warehouse,Active,SRC005
+OCC019,Warehouse Supervisor,LSC/Q0501,SEC006,4,LSC/Q0501,Warehouse Supervisor,Active,SRC005
+OCC020,Security Supervisor,SSC/Q0901,SEC007,4,SSC/Q0901,Security Supervisor,Active,SRC005
+OCC021,Dairy Farmer/Entrepreneur,AGR/Q4101,SEC001,3,AGR/Q4101,Dairy Farmer/Entrepreneur,Active,SRC005
+OCC022,Bar Bender and Steel Fixer,CON/Q0201,SEC004,3,CON/Q0201,Bar Bender and Steel Fixer,Active,SRC005
+OCC023,Brick Mason,CON/Q0101,SEC004,3,CON/Q0101,Brick Mason,Active,SRC005
+OCC024,Shuttering Carpenter,CON/Q0301,SEC004,3,CON/Q0301,Shuttering Carpenter,Active,SRC005
+OCC025,Electrician,ELE/Q0101,SEC011,4,ELE/Q0101,Electrician,Active,SRC009
+OCC026,Electronics Mechanic,ELE/Q0201,SEC011,4,ELE/Q0201,Electronics Mechanic,Active,SRC009
+OCC027,Fitter,FIT/Q0101,SEC012,4,FIT/Q0101,Fitter,Active,SRC009
+OCC028,Mechanic Diesel,MEC/Q0101,SEC012,3,MEC/Q0101,Mechanic Diesel,Active,SRC009
+OCC029,Mechanic Motor Vehicle,MEC/Q0201,SEC012,4,MEC/Q0201,Mechanic Motor Vehicle,Active,SRC009
+OCC030,Refrigeration and Air Conditioner Technician,RAC/Q0101,SEC011,4,RAC/Q0101,Refrigeration and Air Conditioner Technician,Active,SRC009
+OCC031,Welder,WLD/Q0101,SEC012,3,WLD/Q0101,Welder,Active,SRC009
+OCC032,Solar Technician,STE/Q0101,SEC011,3,STE/Q0101,Solar Technician,Active,SRC009

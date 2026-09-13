@@ -1,0 +1,11 @@
+evidence_id,metric_name,metric_value,unit,geography,time_period,source_id,source_reference,calculation_method,is_observed,is_derived,confidence_level,notes
+EV001,Overall LFPR (Usual Status),59.3,%,India,2025,SRC001,Press Note PLFS Annual Report 2025 Table,Directly from source,TRUE,FALSE,High,Usual status ps+ss
+EV002,Overall WPR (Usual Status),57.4,%,India,2025,SRC001,Press Note PLFS Annual Report 2025 Table,Directly from source,TRUE,FALSE,High,Usual status ps+ss
+EV003,Overall UR (Usual Status),3.1,%,India,2025,SRC001,Press Note PLFS Annual Report 2025 Table,Directly from source,TRUE,FALSE,High,Usual status ps+ss
+EV004,Male LFPR (Usual Status),79.1,%,India,2025,SRC001,Press Note PLFS Annual Report 2025 Table,Directly from source,TRUE,FALSE,High,Usual status ps+ss
+EV005,Female LFPR (Usual Status),40.0,%,India,2025,SRC001,Press Note PLFS Annual Report 2025 Table,Directly from source,TRUE,FALSE,High,Usual status ps+ss
+EV006,PMKVY 4.0 Training Centres Maharashtra,684,Centres,Maharashtra,2025,SRC005,Lok Sabha Unstarred Question 399 Answer,Directly from source,TRUE,FALSE,High,As on 31.12.2025
+EV007,NCS Active Jobseekers (FY 2025-26),78.86,Lakh,India,2025-26,SRC006,PIB Release 05.02.2026,Directly from source,TRUE,FALSE,High,As on 20.01.2026
+EV008,NCS Vacancies Mobilised (FY 2025-26),3.43,Crore,India,2025-26,SRC006,PIB Release 05.02.2026,Directly from source,TRUE,FALSE,High,As on 20.01.2026
+EV009,Skill India Digital Hub Courses,2900+,Courses,India,2025-26,SRC010,Anantam IAS Analysis of SIDH,Directly from source,TRUE,FALSE,Medium,Approximate figure from secondary analysis
+EV010,ITI Saoner Total Intake Capacity,120,Seats,Nagpur,2025-26,SRC009,DVET Maharashtra ITI Page,Sum of intake across all trades,TRUE,FALSE,High,Calculated from trade-wise intake

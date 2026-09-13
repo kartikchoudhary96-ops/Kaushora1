@@ -1,0 +1,16 @@
+indicator_id,state_id,district_id,year,period,indicator_name,indicator_value,unit,population_group,rural_urban,status_type,source_id
+LMI001,ST002,,2025,Jan-Dec,LFPR,59.3,%,15 years and above,Total,Usual Status (ps+ss),SRC001
+LMI002,ST002,,2025,Jan-Dec,LFPR,79.1,%,Male 15 years and above,Total,Usual Status (ps+ss),SRC001
+LMI003,ST002,,2025,Jan-Dec,LFPR,40.0,%,Female 15 years and above,Total,Usual Status (ps+ss),SRC001
+LMI004,ST002,,2025,Jan-Dec,WPR,57.4,%,15 years and above,Total,Usual Status (ps+ss),SRC001
+LMI005,ST002,,2025,Jan-Dec,WPR,76.6,%,Male 15 years and above,Total,Usual Status (ps+ss),SRC001
+LMI006,ST002,,2025,Jan-Dec,WPR,38.8,%,Female 15 years and above,Total,Usual Status (ps+ss),SRC001
+LMI007,ST002,,2025,Jan-Dec,UR,3.1,%,15 years and above,Total,Usual Status (ps+ss),SRC001
+LMI008,ST002,,2025,Jan-Dec,UR,6.5,%,Educated (Secondary+),Total,Usual Status (ps+ss),SRC001
+LMI009,ST002,,2025,Jan-Dec,UR,6.4,%,Urban Female,Urban,Usual Status (ps+ss),SRC001
+LMI010,ST002,,2025,Jan-Dec,Regular Wage/Salaried,23.6,%,15 years and above,Total,Usual Status (ps+ss),SRC001
+LMI011,ST002,,2025,Dec,LFPR (CWS),56.1,%,15 years and above,Total,Current Weekly Status,SRC002
+LMI012,ST002,,2025,Dec,LFPR (CWS),59.0,%,15 years and above,Rural,Current Weekly Status,SRC002
+LMI013,ST002,,2025,Dec,LFPR (CWS),50.2,%,15 years and above,Urban,Current Weekly Status,SRC002
+LMI014,ST002,,2025,Dec,Female LFPR (CWS),35.3,%,Female 15 years and above,Total,Current Weekly Status,SRC002
+LMI015,ST002,,2025,Dec,UR (CWS),4.8,%,15 years and above,Total,Current Weekly Status,SRC002

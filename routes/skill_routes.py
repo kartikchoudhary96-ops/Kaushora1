@@ -86,14 +86,20 @@ def skill_one(sid):
             ).fetchall()
         ]
         roles = [dict(r) for r in c.execute("SELECT role_id, job_title, normalized_role, sector, related_skills FROM job_roles").fetchall()]
+        explicit = [dict(r) for r in c.execute(
+            "SELECT r.role_id, r.job_title, r.normalized_role, r.sector, o.importance, o.competency_type, o.nos_code "
+            "FROM occupation_skills o JOIN job_roles r ON r.role_id=o.occupation_id WHERE o.skill_id=?", (sid,)).fetchall()]
     finally:
         c.close()
     from services.data_service import skill_ids_for_phrase
     from services.data_service import split_ids as _split
 
-    hit_roles = []
+    hit_roles = list(explicit)
+    seen = {r["role_id"] for r in hit_roles}
     solo = {sid: {"skill_name": hit["skill_name"], "normalized_skill_name": hit.get("normalized_skill_name")}}
     for r in roles:
+        if r["role_id"] in seen:
+            continue
         if any(sid in skill_ids_for_phrase(ph, solo) for ph in _split(r.get("related_skills"))):
             hit_roles.append(r)
     hit["evidence_jobs"] = jobs
@@ -109,6 +115,7 @@ def skill_one(sid):
         "data_period": hit.get("data_period"),
         "data_type": hit.get("data_type"),
         "is_synthetic": hit.get("is_synthetic"),
+        "data_source": hit.get("data_source") or "REAL",
     }
     return jsonify(hit)
 
@@ -126,7 +133,8 @@ def skill_demand(sid):
             "demand_status": hit["demand_status"],
             "demand_count": hit["demand_count"],
             "growth_rate": hit["growth_rate"],
-            "methodology": "Demo demand score = 60% normalized synthetic job-posting frequency + 40% normalized synthetic employer hiring demand. "
+            "methodology": "No per-skill demand score is calculated: the source skill_demand assessment "
+            "is NULL for every signal (method: 'Not calculated - insufficient signals'). "
             "WEF trends are shown separately because they are qualitative sector signals, not skill-level measurements.",
         }
     )

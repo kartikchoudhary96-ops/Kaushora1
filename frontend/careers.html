@@ -19,11 +19,11 @@
       async function load() {
         page.innerHTML =
           '<div class="eyebrow">Candidate career guidance</div><h1 class="title">Careers</h1>' +
-          '<p class="subtitle">Deterministic skill-to-role matching against NCO roles and QP curricula. No job listings are invented — only catalogued roles, skills and courses.</p>' +
+          '<p class="subtitle">Deterministic skill-to-role matching against 32 NSDC occupations and 15 ITI courses. No job listings are invented — only catalogued occupations, skills and courses.</p>' +
           '<div class="grid cols-32"><div class="card"><div class="eyebrow">Your profile</div><h3>What can you do today?</h3>' +
           '<form id="f"><div class="field"><label for="skills">Current skills (comma separated)</label>' +
           '<input id="skills" name="skills" placeholder="e.g. Python, SQL, documentation" autocomplete="off" />' +
-          '<span class="f-hint">Matched by name against the 9-skill catalog; unknown phrases are ignored, never forced.</span></div>' +
+          '<span class="f-hint">Matched by name against the 20-skill registry; unknown phrases are ignored, never forced.</span></div>' +
           '<div class="field"><label for="sector">Target sector (optional)</label><select id="sector" name="sector"><option value="">All sectors</option></select></div>' +
           '<button class="btn" type="submit" id="go">Analyze my fit</button></form></div>' +
           '<div class="card"><div class="eyebrow">How scoring works</div><h3>Candidate skill match</h3>' +
@@ -50,7 +50,8 @@
           const r = await window.KaushoraAPI.analyzeCareer({ current_skills: skills, target_sector: sector });
           render(r);
         } catch (e) {
-          out.innerHTML = window.KShell.errorState(e.message, null);
+          out.innerHTML = window.KShell.errorState(e.message, "retryAnalyze");
+          window.retryAnalyze = () => analyze({ preventDefault() {} });
         } finally { btn.disabled = false; btn.textContent = "Analyze my fit"; }
       }
 

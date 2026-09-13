@@ -1,0 +1,21 @@
+skill_id,skill_name,skill_category,skill_description,source_id
+SKL001,Communication,Core Skills,Communication related skills applicable to most job roles,SRC004
+SKL002,Basic Housekeeping,Occupational,Carry out basic housekeeping services,SRC003
+SKL003,Install Washing Machine,Technical,Install the washing machine at customer premises,SRC004
+SKL004,Prepare Route Plan,Planning,Prepare optimum route plan to complete daily target visits,SRC004
+SKL005,Remove Packaging,Technical,Remove washing machine packaging and check product,SRC004
+SKL006,Placement of Machine,Technical,Seek customer input on placement of machine,SRC004
+SKL007,Plumbing Installation,Technical,Ensure necessary plumbing installations for water inlet/outlet,SRC004
+SKL008,Quality Check,Technical,Check quality of raw material and finished products,SRC003
+SKL009,Maintain Work Area,Occupational,Maintain work area and tools,SRC003
+SKL010,Health Safety Security,Compliance,Maintain health safety and security at workplace,SRC003
+SKL011,Data Entry,Technical,Domestic data entry operations,SRC005
+SKL012,Web Development,Technical,Web development and programming,SRC005
+SKL013,Graphic Design,Technical,Graphic design and visual communication,SRC005
+SKL014,Food & Beverage Service,Technical,Guest service in food and beverage operations,SRC005
+SKL015,Warehouse Operations,Technical,Warehouse claims coordination and supervision,SRC005
+SKL016,Security Management,Technical,Security supervision and management,SRC005
+SKL017,Dairy Farming,Technical,Dairy farming and entrepreneurship,SRC005
+SKL018,Steel Fixing,Technical,Bar bending and steel fixing for construction,SRC005
+SKL019,Masonry,Technical,Brick masonry construction,SRC005
+SKL020,Carpentry,Technical,Shuttering carpentry and formwork,SRC005

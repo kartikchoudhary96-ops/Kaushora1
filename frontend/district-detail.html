@@ -23,24 +23,41 @@
           const d = await window.KaushoraAPI.district(id);
           render(d);
         } catch (e) {
+          const notFound = e && e.status === 404;
           page.innerHTML = '<a href="districts.html" class="btn ghost sm">← All districts</a><div style="margin-top:14px">' +
-            window.KShell.emptyState("District not found", "No district record exists for “" + esc(id) + "”. " + esc(e.message || "")) + "</div>";
+            (notFound
+              ? window.KShell.emptyState("District not found", "No district record exists for “" + esc(id) + "”. " + esc(e.message || ""))
+              : window.KShell.errorState(e.message, "retryDistrict")) + "</div>";
+          window.retryDistrict = () => load();
         }
       }
       function render(d) {
         const x = d.district || d;
+        const s = d.summary || {};
         page.innerHTML = '<a href="districts.html" class="btn ghost sm">← All districts</a>' +
-          "<h1 class='title' style='margin-top:14px'>" + esc(x.district || id) + "</h1>" +
-          '<p class="subtitle">' + esc(x.state || "") + " · Priority: " + esc(x.priority_level || "—") + "</p>" +
+          "<h1 class='title' style='margin-top:14px'>" + esc(x.district_name || x.district || id) + "</h1>" +
+          '<p class="subtitle">' + esc(x.state_name || x.state || "") + " · Code " + esc(x.district_code || "—") + ' · <span class="pill tag-green">Source data</span></p>' +
           '<div class="grid cols-3">' +
-          metric("Training demand", x.estimated_training_demand) + metric("Annual capacity", x.annual_training_capacity) + metric("Capacity gap", d.capacity_gap) +
+          metric("Recorded centres", s.training_centres) + metric("Capacity facts", s.capacity_facts) + metric("Recommendations", s.recommendations) +
           '</div><div class="evidence-strip" style="margin-top:16px">' + window.KIcon("shield") + '<div>' + esc(d.note || "") + '</div></div>' +
-          '<div class="grid cols-2" style="margin-top:16px"><div class="card"><div class="eyebrow">Training footprint</div><h3>' + (d.summary || {}).training_centres + ' centres</h3>' +
-          table((d.training_centres || []), ["centre_name", "annual_capacity", "current_enrollment"], ["Centre", "Capacity", "Enrolled"]) +
-          '</div><div class="card"><div class="eyebrow">Placement outcomes</div><h3>' + ((d.summary || {}).placement_rate == null ? "—" : (d.summary || {}).placement_rate + "%") + ' average rate</h3>' +
-          table((d.placements || []).slice(0, 6), ["course_name", "training_year", "placement_rate"], ["Course", "Year", "Placed"]) + '</div></div>' +
-          '<div class="card" style="margin-top:16px"><div class="eyebrow">Recent job postings</div><h3>' + (d.summary || {}).job_postings + ' records in this district</h3>' +
-          table((d.job_postings || []), ["job_title", "sector", "posting_date"], ["Role", "Sector", "Posted"]) + '</div>';
+          '<div class="grid cols-2" style="margin-top:16px"><div class="card"><div class="eyebrow">Training footprint (source data)</div><h3>' + s.training_centres + ' centres</h3>' +
+          table((d.training_centres || []), ["centre_name", "centre_type", "provider", "scheme"], ["Centre", "Type", "Provider", "Scheme"]) +
+          '</div><div class="card"><div class="eyebrow">Capacity facts (source data)</div><h3>' + s.capacity_facts + ' published fact(s)</h3>' +
+          (((d.capacity || []).length) ? '<div class="table-wrap"><table class="data" style="min-width:0"><thead><tr><th>Scheme</th><th>Centres</th><th>Seats</th><th>Year</th></tr></thead><tbody>' +
+            d.capacity.map((r) => "<tr><td>" + esc(r.scheme || "—") + "</td><td>" + (r.training_centres == null ? "—" : r.training_centres) + "</td><td>" + (r.training_seats == null ? "—" : r.training_seats) + "</td><td>" + esc(r.year == null ? (r.period || "—") : r.year) + "</td></tr>").join("") + "</tbody></table></div>" +
+            '<p class="hint">NULL = not published in source (never zero-filled). Capacity gaps cannot be estimated where demand is unpublished.</p>'
+            : '<p class="hint">No capacity facts published for this district.</p>') + '</div></div>' +
+          '<div class="grid cols-2" style="margin-top:16px"><div class="card"><div class="eyebrow">Recommendations</div><h3>Evidence-based actions</h3>' +
+          (((d.recommendations || []).length) ? "<ul style='margin:8px 0 0;padding-left:20px'>" + d.recommendations.map((r) =>
+            "<li style='margin:6px 0'><b>[" + esc(r.priority || "") + "] " + esc(r.recommendation_type || "") + ":</b> " + esc(r.recommendation_text || "") +
+            "<br><span style='color:var(--muted);font-size:12.5px'>" + esc(r.reason || "") + "</span></li>").join("") + "</ul>"
+            : '<p class="hint">No recommendations recorded for this district.</p>') + '</div>' +
+          '<div class="card"><div class="eyebrow">Skill-gap assessment (source data)</div><h3>District gaps</h3>' +
+          (((d.skill_gaps || []).length) ? d.skill_gaps.map((g) =>
+            '<p><b>' + esc(g.skill_name || g.skill_id) + ':</b> <span class="pill tag-grey">' + esc(g.gap_status || "—") + "</span><br><span class='hint'>" + esc(g.calculation_method || "") + "</span></p>").join("")
+            : '<p class="hint">No gap assessment published for this district.</p>') + '</div></div>' +
+          '<div class="card" style="margin-top:16px"><div class="eyebrow">Labour context (state-level — not downscaled)</div><h3>Maharashtra / national indicators</h3>' +
+          table((d.state_indicators || []).slice(0, 8), ["indicator_name", "indicator_value", "unit", "population_group"], ["Indicator", "Value", "Unit", "Group"]) + '</div>';
       }
       function metric(label, value) { return '<div class="card kpi"><div class="k-label">' + esc(label) + '</div><div class="k-value">' + (value == null ? "—" : esc(value)) + '</div></div>'; }
       function table(rows, keys, labels) {

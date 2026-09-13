@@ -1,0 +1,14 @@
+sector_id,sector_name,sector_description,source_id
+SEC001,Agriculture,Crop production animal husbandry and allied activities,SRC003
+SEC002,Apparel Made-Ups & Home Furnishing,Garment manufacturing and home textile production,SRC003
+SEC003,Beauty & Wellness,Personal care beauty therapy and wellness services,SRC003
+SEC004,Construction,Building and infrastructure construction trades,SRC005
+SEC005,IT-ITeS,Information technology and IT-enabled services,SRC005
+SEC006,Logistics,Warehousing supply chain and freight operations,SRC005
+SEC007,Management,Business administration and supervisory roles,SRC005
+SEC008,Media & Entertainment,Graphic design and creative media production,SRC005
+SEC009,Tourism & Hospitality,Food and beverage service guest relations,SRC005
+SEC010,Life Sciences,Pharmaceutical and medical device regulatory affairs,SRC005
+SEC011,Electronics,Consumer electronics and hardware maintenance,SRC004
+SEC012,Automotive,Automotive manufacturing and service,SRC008
+SEC013,Healthcare,Allied health and paramedical services,SRC008

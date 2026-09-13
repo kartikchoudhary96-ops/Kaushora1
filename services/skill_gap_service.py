@@ -1,14 +1,23 @@
-"""Gap analysis on the Real Evidence Dataset.
+"""Gap analysis on the Kaushora real public CSV dataset.
 
-Coverage-alignment methodology (documented — market-demand component is
-unavailable because JOB_DEMAND/EMPLOYER_REQUIREMENTS are empty):
-  required(course) = union of catalog skills text-matched from the
-                     related_skills of roles whose title matches the
-                     course's target_roles phrases (match basis recorded;
-                     unmapped phrases reported, never forced)
+Coverage-alignment methodology (explicit mappings only, never fabricated):
+  required(course) = skills required by the best-matching SAME-SECTOR
+    occupation, where requirements come from the explicit occupation_skills
+    table (NOS-coded, observed). Cross-sector pairings are never scored
+    (an Electrician course is not judged against Inline Checker requirements).
+    Best match = highest |course skills ∩ required| / |required|, tie-break
+    larger overlap then occupation_id (deterministic).
   alignment_score  = (adequate + 0.5 * partial) / len(required) * 100
-Industry proficiency defaults to Intermediate (no employer evidence for
-these skills); curriculum proficiency comes from CURRICULUM rows.
+  Provided curriculum_alignment_ref pairs are shown verbatim as observed
+  reference alongside the independent engine score.
+  Courses with no recorded skill coverage, or with no same-sector occupation
+  carrying explicit requirements, are Cannot Assess (never scored 0 as a
+  false signal — except recorded-empty coverage vs explicit requirements).
+Industry proficiency: observed employer surveys (deterministic majority,
+ties to lower rank) else importance mapping High->Advanced,
+Medium->Intermediate, else Intermediate. Curriculum proficiency: taught at
+Intermediate baseline (no per-skill proficiency published in source).
+Coverage_level from course_skills (all Full in source).
 """
 from .db import get_db
 from .data_service import split_ids, tokens, skill_ids_for_phrase, normalize_skill_name
@@ -34,6 +43,9 @@ def _role_match_score(phrase, role):
     return False
 
 
+IMP_TO_PROF = {"High": "Advanced", "Medium": "Intermediate", "Low": "Basic"}
+
+
 def course_alignment(course_id):
     c = get_db()
     try:
@@ -41,28 +53,70 @@ def course_alignment(course_id):
         if not co:
             return None
         co = dict(co)
-        roles = [dict(r) for r in c.execute("SELECT * FROM job_roles").fetchall()]
+        roles = {r["role_id"]: dict(r) for r in c.execute("SELECT * FROM job_roles").fetchall()}
         skills = {r["id"]: dict(r) for r in c.execute("SELECT * FROM skills").fetchall()}
-        cur = [dict(r) for r in c.execute("SELECT * FROM curriculum WHERE course_id=?", (course_id,)).fetchall()]
+        taught_rows = [dict(r) for r in c.execute("SELECT * FROM course_skills WHERE course_id=?", (course_id,)).fetchall()]
+        occ_reqs = {}
+        occ_imp = {}
+        for m in c.execute("SELECT occupation_id, skill_id, importance FROM occupation_skills").fetchall():
+            occ_reqs.setdefault(m["occupation_id"], set()).add(m["skill_id"])
+            occ_imp[(m["occupation_id"], m["skill_id"])] = m["importance"]
+        refs = [dict(r) for r in c.execute("SELECT * FROM curriculum_alignment_ref WHERE course_id=?", (course_id,)).fetchall()]
     finally:
         c.close()
     taught = set(split_ids(co.get("skills_taught")))
-    taught |= {m["skill_id"] for m in cur if m.get("skill_id")}
-    required = set()
-    matched_roles, unmapped_phrases, unmatched_targets = [], [], []
-    for phrase in split_ids(co.get("target_roles")):
-        hit_roles = [r for r in roles if _role_match_score(phrase, r)]
-        if not hit_roles:
-            unmatched_targets.append(phrase)
-            continue
-        for r in hit_roles:
-            matched_roles.append(r["role_id"])
-            for sp in split_ids(r.get("related_skills")):
-                hits = skill_ids_for_phrase(sp, skills)
-                if hits:
-                    required.update(hits)
-                elif sp not in unmapped_phrases:
-                    unmapped_phrases.append(sp)
+    taught |= {m["skill_id"] for m in taught_rows if m.get("skill_id")}
+    coverage = {m["skill_id"]: (m.get("coverage_level") or "Full") for m in taught_rows if m.get("skill_id")}
+    course_sector = co.get("sector_id")
+    occ_sector_of = {oid: roles[oid].get("sector_id") for oid in occ_reqs if oid in roles}
+
+    def _cannot_assess(reason):
+        return {
+            "course": co,
+            "alignment_score": None,
+            "recommended_action": "Cannot assess",
+            "industry_skill_count": 0,
+            "curriculum_skill_count": len(taught),
+            "matched": 0,
+            "missing_count": 0,
+            "missing_skills": [],
+            "partial_skills": [],
+            "adequate_skills": [],
+            "obsolete_skills": [],
+            "recommended_additions": [],
+            "recommended_updates": [],
+            "low_relevance_review": [],
+            "matched_roles": [],
+            "reference_pairs": refs,
+            "unmapped_role_phrases": [],
+            "unmapped_requirement_phrases": [],
+            "methodology": reason,
+            "evidence": {
+                "source": "NSDC occupation_skills + ITI course_skills (real public CSV)",
+                "data_type": "real public sources (is_synthetic=0, data_source=REAL)",
+            },
+        }
+
+    if not taught:
+        return _cannot_assess("withheld: course has no recorded skill coverage in course_skills")
+    # Same-sector explicit matches only — cross-sector pairings are fabricated
+    candidates = [oid for oid in occ_reqs if occ_reqs[oid] and occ_sector_of.get(oid) == course_sector]
+    if not candidates:
+        return _cannot_assess(
+            "withheld: no same-sector occupation carries explicit skill requirements "
+            "(cross-sector matching would fabricate a mapping)"
+        )
+    scored = []
+    for oid in candidates:
+        req = occ_reqs[oid]
+        inter = taught & req
+        scored.append((len(inter) / len(req), len(inter), oid))
+    scored.sort(key=lambda x: (-x[0], -x[1], x[2]))
+    best_oid = scored[0][2]
+    required = set(occ_reqs[best_oid])
+    matched_roles = [best_oid]
+    unmapped_phrases = []
+    unmatched_targets = []
     emp = [e for e in _rows("SELECT skill_id, required_proficiency FROM employer_surveys") if (e.get("skill_id") or "") in skills]
     prof = {}
     for e in emp:
@@ -70,24 +124,26 @@ def course_alignment(course_id):
 
     def ind_prof(sid):
         lst = prof.get(sid, [])
-        if not lst:
-            return "Intermediate"
-        # Deterministic majority vote. Ties MUST NOT use max(set(...)) —
-        # set iteration order depends on PYTHONHASHSEED, which made the same
-        # DB return 75.0 in one process and 62.5 in another. Ties resolve to
-        # the lower proficiency (conservative: never overstate a gap).
-        best, best_n = "Intermediate", -1
-        for cand in sorted(set(lst), key=lambda p: PROF_RANK.get(p, 2)):
-            n = lst.count(cand)
-            if n > best_n:
-                best, best_n = cand, n
-        return best
+        if lst:
+            # Deterministic majority vote; ties resolve to lower rank
+            # (never overstate a gap; set order is hash-randomized).
+            best, best_n = "Intermediate", -1
+            for cand in sorted(set(lst), key=lambda p: PROF_RANK.get(p, 2)):
+                n = lst.count(cand)
+                if n > best_n:
+                    best, best_n = cand, n
+            return best
+        imp = occ_imp.get((best_oid, sid))
+        if imp:
+            return IMP_TO_PROF.get(imp, "Intermediate")
+        return "Intermediate"
 
     def cur_prof(sid):
-        for m in cur:
-            if m.get("skill_id") == sid:
-                return m.get("proficiency_level") or "Intermediate"
-        return "Beginner" if sid not in taught else "Intermediate"
+        # Source publishes no per-skill proficiency: Full coverage taught at
+        # Intermediate baseline (documented convention, not a measurement).
+        if sid not in taught:
+            return "Beginner"
+        return "Intermediate" if coverage.get(sid, "Full") == "Full" else "Basic"
 
     demand = {s["id"]: s["demand_score"] for s in compute_skill_demand()}
     missing, partial, adequate = [], [], []
@@ -128,33 +184,6 @@ def course_alignment(course_id):
                     }
                 )
     denom = len(required) if required else 1
-    if not required and unmatched_targets:
-        # The course's stated target roles are absent from the role catalog:
-        # scoring 0 would be a false signal, so assessment is withheld.
-        return {
-            "course": co,
-            "alignment_score": None,
-            "recommended_action": "Cannot assess",
-            "industry_skill_count": 0,
-            "curriculum_skill_count": len(taught),
-            "matched": 0,
-            "missing_count": 0,
-            "missing_skills": [],
-            "partial_skills": [],
-            "adequate_skills": [],
-            "obsolete_skills": [],
-            "recommended_additions": [],
-            "recommended_updates": [],
-            "low_relevance_review": [],
-            "matched_roles": [],
-            "unmapped_role_phrases": unmatched_targets,
-            "unmapped_requirement_phrases": unmapped_phrases,
-            "methodology": "withheld: target roles not present in the role catalog",
-            "evidence": {
-                "source": "NCO 2015 job_roles + QP curriculum (Real Evidence Dataset)",
-                "data_type": "real public sources (is_synthetic=0)",
-            },
-        }
     score = round((len(adequate) + 0.5 * len(partial)) / denom * 100, 1)
     if score >= 80:
         action = "Maintain"
@@ -187,15 +216,16 @@ def course_alignment(course_id):
         "recommended_additions": rec_add,
         "recommended_updates": rec_up,
         "low_relevance_review": [],
-        "matched_roles": sorted(set(matched_roles)),
-        "unmapped_role_phrases": unmatched_targets,
-        "unmapped_requirement_phrases": unmapped_phrases,
-        "methodology": "coverage alignment = matched/required role-mapped skills; market-demand component unavailable (no demand signals in dataset)",
-        "evidence": {
-            "source": "NCO 2015 job_roles + QP curriculum (Real Evidence Dataset)",
-            "data_type": "real public sources (is_synthetic=0)",
-        },
-    }
+            "matched_roles": sorted(set(matched_roles)),
+            "reference_pairs": refs,
+            "unmapped_role_phrases": unmatched_targets,
+            "unmapped_requirement_phrases": unmapped_phrases,
+            "methodology": "coverage alignment = (adequate + 0.5*partial)/required vs best explicit occupation match; requirements from NOS-coded occupation_skills; curriculum proficiency baseline Intermediate (no per-skill proficiency published)",
+            "evidence": {
+                "source": "NSDC occupation_skills + ITI course_skills (real public CSV)",
+                "data_type": "real public sources (is_synthetic=0, data_source=REAL)",
+            },
+        }
 
 
 def skill_gap_for_skill(skill_id):
@@ -224,20 +254,26 @@ def skill_gap_for_skill(skill_id):
         "taught_by_courses": taught_by,
         "gap_status": status,
         "gap_severity": severity,
-        "methodology": "role requirements text-matched from NCO related_skills vs QP-taught skills; unmapped phrases excluded, never forced",
-        "evidence": "NCO 2015 job_roles + QP curriculum (Real Evidence Dataset, is_synthetic=0)",
+        "methodology": "explicit NOS-coded occupation_skills vs course_skills coverage; unmapped occupations excluded, never forced",
+        "evidence": "NSDC occupation_skills + ITI course_skills (real public CSV, is_synthetic=0, data_source=REAL)",
     }
 
 
 def district_detail(district_id):
+    """Real district intelligence: master record + centres + capacity facts +
+    state-level indicators (explicitly labeled, never downscaled) +
+    recommendations + provided gap assessment."""
     c = get_db()
     try:
-        d = c.execute("SELECT * FROM district_capacity WHERE district_id=?", (district_id,)).fetchone()
+        d = c.execute("SELECT * FROM districts WHERE district_id=?", (district_id,)).fetchone()
         if not d:
             return None
         district = dict(d)
         centres = [dict(r) for r in c.execute(
-            "SELECT * FROM training_centres WHERE district=? ORDER BY centre_name", (district["district"],)
+            "SELECT * FROM training_centres WHERE district_id=? ORDER BY centre_name", (district_id,)
+        ).fetchall()]
+        caps = [dict(r) for r in c.execute(
+            "SELECT * FROM district_capacity WHERE district_id=?", (district_id,)
         ).fetchall()]
         placements = [dict(r) for r in c.execute(
             "SELECT p.*, co.course_name FROM placements p LEFT JOIN courses co ON co.id=p.course_id "
@@ -245,17 +281,38 @@ def district_detail(district_id):
         ).fetchall()]
         jobs = [dict(r) for r in c.execute(
             "SELECT job_title, sector, posting_date, salary_min, salary_max, skill_ids FROM job_postings "
-            "WHERE district=? ORDER BY posting_date DESC LIMIT 12", (district["district"],)
+            "WHERE district=? ORDER BY posting_date DESC LIMIT 12", (district["district_name"],)
+        ).fetchall()]
+        recs = [dict(r) for r in c.execute(
+            "SELECT r.*, s.skill_name FROM recommendations r LEFT JOIN skills s ON s.id=r.skill_id "
+            "WHERE r.district_id=? ORDER BY r.priority, r.recommendation_id", (district_id,)
+        ).fetchall()]
+        gaps = [dict(r) for r in c.execute(
+            "SELECT g.*, s.skill_name FROM district_skill_gaps g LEFT JOIN skills s ON s.id=g.skill_id "
+            "WHERE g.district_id=?", (district_id,)
+        ).fetchall()]
+        state_inds = [dict(r) for r in c.execute(
+            "SELECT indicator_name, indicator_value, unit, period, population_group FROM labour_indicators "
+            "WHERE state_id=? ORDER BY indicator_id", (district.get("state_id"),)
         ).fetchall()]
         avg_rate = round(sum(float(p["placement_rate"] or 0) for p in placements) / len(placements), 1) if placements else None
         return {
             "district": district,
-            "capacity_gap": int(district.get("estimated_training_demand") or 0) - int(district.get("annual_training_capacity") or 0),
+            "capacity": caps,
+            "capacity_gap": None,  # demand unpublished in source; honestly unavailable
             "training_centres": centres,
             "placements": placements,
             "job_postings": jobs,
-            "summary": {"job_postings": len(jobs), "training_centres": len(centres), "placement_rate": avg_rate},
-            "note": "All district, placement and job-posting records on this page are deterministic synthetic demo data (is_synthetic=1).",
+            "recommendations": recs,
+            "skill_gaps": gaps,
+            "state_indicators": state_inds,
+            "summary": {"job_postings": len(jobs), "training_centres": len(centres),
+                        "placement_rate": avg_rate, "capacity_facts": len(caps),
+                        "recommendations": len(recs)},
+            "note": "Source data: PMKVY/DVET centre and capacity records (REAL). "
+                    "Indicators shown are state-level (Maharashtra/national) — no district-level PLFS is published. "
+                    "Capacity gaps cannot be estimated where training demand is unpublished.",
+            "data_source": "REAL",
         }
     finally:
         c.close()
@@ -293,7 +350,7 @@ def career_analyze(payload):
                 {
                     "role_id": r["role_id"],
                     "job_title": r["job_title"],
-                    "reason": "No skill requirements mappable to the current 9-skill catalog",
+                    "reason": "No skill requirements mapped to this occupation in the source (only 4 of 32 occupations carry explicit NOS links)",
                 }
             )
             continue
@@ -339,6 +396,6 @@ def career_analyze(payload):
         "trend_context": [
             {"technology": t["technology"], "direction": t.get("trend_direction"), "evidence": t.get("evidence")} for t in trends
         ],
-        "evidence_note": "Matched against NCO 2015 roles and NSQF Qualification Pack curricula "
-        "(Kaushora Real Evidence Dataset — real public sources). No employment guarantee.",
+        "evidence_note": "Matched against NSDC occupations with explicit NOS skill links and ITI course coverage "
+        "(Kaushora real public CSV dataset — PLFS/NSDC/MSDE/DGT/DVET sources). No employment guarantee.",
     }
