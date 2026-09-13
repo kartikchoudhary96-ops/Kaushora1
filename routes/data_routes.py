@@ -72,6 +72,17 @@ def data_status():
 def dashboard_demand():
     skills = compute_skill_demand()
     trends = trend_signals()
+    demand_with_score = [s for s in skills if s.get("demand_score") is not None]
+    demand_insufficient = [s for s in skills if s["demand_status"] == "Insufficient data"]
+    if demand_with_score and demand_insufficient:
+        status = "mixed"
+        reason = f"{len(demand_with_score)} skills have observed demand signals from WEF/NASSCOM; {len(demand_insufficient)} skills have insufficient source evidence for demand scoring."
+    elif demand_with_score:
+        status = "data_available"
+        reason = f"All {len(demand_with_score)} skills have observed demand signals."
+    else:
+        status = "insufficient_data"
+        reason = "The source skill_demand assessment carries NULL for every signal."
     return jsonify(
         {
             "success": True,
@@ -82,9 +93,9 @@ def dashboard_demand():
                     for s in skills
                 ],
                 "trend_signals": trends,
-                "status": "insufficient_data",
-                "reason": "The source skill_demand assessment carries NULL for every signal (employment, occupation, training-gap, growth) with method 'Not calculated - insufficient signals'. National aggregates (LFPR/WPR/UR, NCS vacancies) are shown as evidence, never converted into per-skill scores.",
-                "methodology": "No per-skill demand score is calculated: insufficient source signals.Demand would combine normalized vacancy, growth and employer evidence if published.",
+                "status": status,
+                "reason": reason,
+                "methodology": "Observed demand scores from WEF/NASSCOM reports where available; insufficient for remaining skills.",
             },
             "meta": {"source": META["source"], "record_count": len(skills)},
             "error": None,

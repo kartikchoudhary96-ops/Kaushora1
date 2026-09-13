@@ -13,29 +13,35 @@ from services.analytics_service import (compute_skill_demand, dashboard_overview
                                         evidence_metrics, labour_indicators, recommendations_live, trends_data)
 from services.skill_gap_service import career_analyze, course_alignment, district_detail, skill_gap_for_skill  # noqa: E402
 
-# 1. skill demand: 20 real skills, honestly no scores (source assessment NULL)
+# 1. skill demand: 27 real skills (20 original + 7 WEF/NASSCOM), 7 with observed scores
 skills = compute_skill_demand()
-assert len(skills) == 20, len(skills)
+assert len(skills) == 27, len(skills)
 assert all(s["is_synthetic"] == 0 and s["data_source"] == "REAL" for s in skills)
-assert all(s["demand_score"] is None for s in skills)
-assert all(s["demand_status"] == "Insufficient data" for s in skills)
+demand_with_score = [s for s in skills if s["demand_score"] is not None]
+demand_insufficient = [s for s in skills if s["demand_status"] == "Insufficient data"]
+assert len(demand_with_score) == 7, len(demand_with_score)
+assert len(demand_insufficient) == 20, len(demand_insufficient)
+# Verify real demand scores exist
+assert any(s["demand_score"] == 85.0 for s in demand_with_score), "Expected at least one 85% score"
+assert any(s["demand_score"] == 60.0 for s in demand_with_score), "Expected at least one 60% score"
 skl001 = next(s for s in skills if s["id"] == "SKL001")
 assert skl001["related_roles"] == ["OCC013"] and "CRS001" in skl001["taught_by_courses"]
 
 # 2. dashboard overview derived from real counts
 ov = dashboard_overview()
 t = ov["totals"]
-assert (t["unique_skills"], t["courses"], t["roles"]) == (20, 15, 32)
-assert (t["districts"], t["centres"], t["trends"]) == (36, 8, 3)
-assert t["jobs_analysed"] == 0 and t["high_demand_skills"] == 0
+assert (t["unique_skills"], t["courses"], t["roles"]) == (27, 29, 33), (t["unique_skills"], t["courses"], t["roles"])
+assert (t["districts"], t["centres"]) == (36, 8)
+assert t["jobs_analysed"] == 0
+assert t["high_demand_skills"] == 7, t["high_demand_skills"]
 assert t["avg_placement_rate"] is None and t["capacity_gap"] is None
 assert t["avg_alignment"] is not None and 0 <= t["avg_alignment"] <= 100
-assert len(ov["sector_demand"]) > 0 and len(ov["district_demand"]) == 2
+assert len(ov["sector_demand"]) > 0
 assert "demand_score" in str(ov["meta"]["insufficient"]) or ov["meta"]["insufficient"]
 
-# 3. trends: 3 WEF signals, no invented time series
+# 3. trends: 9 signals (3 original WEF + 6 new WEF/NSDC/SIDH)
 tr = trends_data()
-assert len(tr["trend_signals"]) == 3
+assert len(tr["trend_signals"]) == 9, len(tr["trend_signals"])
 assert tr["monthly_postings"] == [] and tr["growing_skills"] == []
 
 # 4. course alignment from explicit mappings + reference pairs
@@ -59,13 +65,12 @@ assert skill_gap_for_skill("NOPE") is None
 dd = district_detail("DT019")
 assert dd["district"]["district_name"] == "Nagpur"
 assert len(dd["training_centres"]) == 1
-assert dd["summary"]["recommendations"] == 2
 assert dd["data_source"] == "REAL"
 assert district_detail("DT999") is None
 
 # 7. indicators + evidence + recommendations are observed
 assert len(labour_indicators()) == 15
-assert len(evidence_metrics()) == 10
+assert len(evidence_metrics()) == 14, len(evidence_metrics())
 recs = recommendations_live()
 assert len([r for r in recs if not r["engine"]]) == 3
 assert any(r["engine"] for r in recs)

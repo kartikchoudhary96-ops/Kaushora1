@@ -24,14 +24,16 @@ from .db import get_db
 from .data_service import split_ids, skill_ids_for_phrase
 
 META = {
-    "source": "Kaushora real public dataset: PLFS (MoSPI), NSDC Qualification Packs, PMKVY Maharashtra (MSDE), NCS portal, DVET Maharashtra, DGT CTS, WEF trends",
-    "data_file": "data/raw/csv/*.csv (18 files)",
+    "source": "Kaushora real public dataset: PLFS (MoSPI), NSDC Qualification Packs, PMKVY Maharashtra (MSDE), NCS portal, DVET Maharashtra, DGT CTS, WEF trends, India Skills Report, NASSCOM, World Bank",
+    "data_file": "data/raw/csv/*.csv (18 files) + new research package (12 CSVs)",
     "data_type": "official government statistics + public QP/course/centre records (is_synthetic=0, data_source=REAL)",
     "limitations": [
-        "No per-skill demand signals in source (skill_demand row is NULL) — demand scores honestly unavailable.",
+        "Per-skill demand signals: 7 skills have observed demand (WEF/NASSCOM), 20 skills remain insufficient.",
         "Labour indicators are state/national level; no district-level PLFS published — never downscaled.",
         "Capacity facts are sparse (3 districts); seats/enrolments mostly unpublished (NULL).",
-        "Explicit occupation-skill links cover 4 of 32 occupations; the rest are honestly unscored.",
+        "Explicit occupation-skill links cover 4 of 33 occupations; the rest are honestly unscored.",
+        "District skill gaps: 5 state-level sector observations (NSDC 2013), not district-specific.",
+        "Placements: 5 aggregate PMKVY records; no course-level or district-level placement data.",
     ],
 }
 
@@ -149,8 +151,8 @@ def course_skill_map():
 
 
 def compute_skill_demand():
-    """Per-skill demand: honestly insufficient (source assessment is NULL).
-    Returns catalog rows with related roles/courses from explicit mappings."""
+    """Per-skill demand: 7 skills have observed demand signals (WEF/NASSCOM),
+    20 skills remain insufficient. Returns catalog rows with related roles/courses."""
     skills = skill_maps()
     _, cnt, _, _ = job_skill_counts()
     emp_tot, _ = employer_stats()
@@ -165,14 +167,30 @@ def compute_skill_demand():
     for rid, sids in role_req.items():
         for sid in sids:
             skill_roles[sid].append(rid)
-    # Source demand assessment (single honest row, all signals NULL)
-    assessments = {r["skill_id"]: r for r in _rows("SELECT * FROM skill_demand")}
+    # Source demand assessment rows (7 real signals, mapped by skill_id or skill_name)
+    assessments = {}
+    for r in _rows("SELECT * FROM skill_demand"):
+        if r.get("skill_id"):
+            assessments[r["skill_id"]] = r
+        elif r.get("skill_name"):
+            # Try to match by name
+            for sid, s in skills.items():
+                if s.get("skill_name", "").lower() == r["skill_name"].lower():
+                    assessments[sid] = r
+                    break
     out = []
     for sid, s in skills.items():
         job_c = cnt.get(sid, 0)
         emp_raw = emp_tot.get(sid, 0)
         place_n = float(skill_place.get(sid, 0))
-        status = demand_status(None, None, job_c, emp_raw, place_n)
+        # Use real demand signal if available from source
+        assessment = assessments.get(sid)
+        if assessment and assessment.get("demand_score") is not None:
+            d_score = assessment["demand_score"]
+            d_status = demand_status(d_score, None, job_c, emp_raw, place_n)
+        else:
+            d_score = None
+            d_status = demand_status(None, None, job_c, emp_raw, place_n)
         taught_by = sorted([cid for cid, ss in cmap.items() if sid in ss])
         out.append(
             {
@@ -186,9 +204,11 @@ def compute_skill_demand():
                 "demand_count": job_c,
                 "employer_demand": emp_raw,
                 "placement_relevance": round(place_n, 1),
-                "demand_score": None,
-                "demand_status": status,
-                "demand_assessment": assessments.get(sid),
+                "demand_score": d_score,
+                "demand_status": d_status,
+                "demand_source_signal": assessment.get("employment_signal") if assessment else None,
+                "demand_source_level": assessment.get("demand_status") if assessment else None,
+                "demand_assessment": assessment,
                 "top_sectors": [],
                 "top_districts": [],
                 "taught_by_courses": taught_by,
@@ -210,8 +230,16 @@ def compute_skill_demand():
 
 
 def demand_status(score, growth, count, employer=0, placement=0):
-    # Source skill_demand assessment is NULL for every signal: no score can
-    # be calculated. Thresholds below apply only if real signals arrive.
+    """Demand status: uses real score from source when available,
+    falls back to insufficient when no signals exist."""
+    if score is not None:
+        if score >= 75:
+            return "Critical Demand"
+        if score >= 55:
+            return "High Demand"
+        if score >= 35:
+            return "Moderate"
+        return "Low"
     if (count or 0) == 0 and (employer or 0) == 0 and (placement or 0) == 0:
         return "Insufficient data"
     if growth is not None and growth < 0 and (score or 0) < 45:
@@ -222,8 +250,6 @@ def demand_status(score, growth, count, employer=0, placement=0):
         return "High Demand"
     if (score or 0) >= 35:
         return "Moderate"
-    if (score or 0) >= 15:
-        return "Low"
     return "Low"
 
 
@@ -307,9 +333,25 @@ def recommendations_live():
             "recommendation_text": "Publish NOS-coded skill requirements for occupations lacking explicit mappings (e.g. %s)" % (
                 ", ".join(f"{rid} {names.get(rid, '')}" for rid in unmapped)),
             "priority": "Low",
-            "reason": "Only 4 of 32 occupations carry explicit occupation-skill links, limiting gap analysis.",
+            "reason": "Only 4 of 33 occupations carry explicit occupation-skill links, limiting gap analysis.",
             "supporting_evidence": None, "source_ids": "SRC003,SRC004",
             "is_derived": 1, "data_source": "REAL", "engine": True,
+        })
+    # Engine: state-level sector skill gaps as actionable intelligence
+    gaps = _rows("SELECT * FROM district_skill_gaps WHERE demand_signal IS NOT NULL")
+    for g in gaps[:3]:
+        out.append({
+            "recommendation_id": f"ENG-GAP-{g['gap_id']}",
+            "district_id": None, "district_name": "Maharashtra (state-level)",
+            "skill_id": g.get("skill_id"), "skill_name": None,
+            "occupation_id": None, "job_title": None,
+            "recommendation_type": "Address skill gap",
+            "recommendation_text": f"{g.get('demand_signal','')} gap in sector: {g.get('evidence_sources','')}",
+            "priority": "High" if "High" in (g.get("demand_signal") or "") else "Medium",
+            "reason": f"Observed sector-level skill gap from {g.get('calculation_method','source')}",
+            "supporting_evidence": g.get("evidence_sources"),
+            "source_ids": "SRC003",
+            "is_derived": 0, "data_source": "REAL", "engine": True,
         })
     return out
 
@@ -364,7 +406,7 @@ def dashboard_overview():
     avg_align = round(sum(aligns) / len(aligns), 1) if aligns else None
     need_review = sum(1 for a in aligns if a < 65)
 
-    avg_placement = None  # placements table empty in source
+    avg_placement = None  # placements table has state-level aggregates only
     capacity_gap = None  # demand unpublished in source
     high_demand = sum(1 for s in skills if s["demand_status"] in ("Critical Demand", "High Demand"))
 

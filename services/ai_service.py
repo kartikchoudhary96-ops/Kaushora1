@@ -37,6 +37,8 @@ def build_context(student_id=None, entity=None, entity_id=None):
     try:
         courses = [dict(r) for r in c.execute(
             "SELECT id, course_name, sector, nsqf_level FROM courses ORDER BY id").fetchall()]
+        employer_ev = [dict(r) for r in c.execute("SELECT * FROM employer_evidence").fetchall()]
+        skill_gaps = [dict(r) for r in c.execute("SELECT * FROM district_skill_gaps WHERE demand_signal IS NOT NULL").fetchall()]
     finally:
         c.close()
     scored = []
@@ -69,12 +71,19 @@ def build_context(student_id=None, entity=None, entity_id=None):
             {"metric": r["metric_name"], "value": r["metric_value"], "unit": r.get("unit"),
              "geography": r.get("geography")}
             for r in evidence_metrics()],
+        "employer_evidence": [
+            {"finding": r["finding"], "source": r["source"], "year": r.get("year"),
+             "sample_size": r.get("sample_size")}
+            for r in employer_ev if r.get("finding")],
+        "skill_gaps": [
+            {"sector": r.get("demand_signal"), "source": r.get("evidence_sources")}
+            for r in skill_gaps],
         "recommendations": [
             {"type": r.get("recommendation_type"), "text": r.get("recommendation_text"),
              "priority": r.get("priority"), "engine": bool(r.get("engine"))}
             for r in recommendations_live()[:8]],
         "skills": [{"id": s["id"], "name": s["skill_name"],
-                    "status": s["demand_status"]} for s in compute_skill_demand()],
+                    "status": s["demand_status"], "score": s.get("demand_score")} for s in compute_skill_demand()],
         "trends": [{"technology": t["technology"], "direction": t.get("trend_direction"),
                     "evidence": t.get("evidence")} for t in trend_signals()],
     }
@@ -177,10 +186,11 @@ def fallback_answer(question, ctx):
         )
     if "career" in q or "occupation" in q or "job role" in q or "qp " in q:
         return (
-            "Career matching compares your skills against 32 NSDC occupations with QP codes and NSQF "
-            "levels. Only 4 occupations carry explicit NOS skill links, so matches outside those are "
-            "reported as unscored rather than zero. Recommended courses come only from the 15 recorded "
-            "ITI courses. Try Careers with e.g. 'Data Entry' or 'Communication'.",
+            "Career matching compares your skills against 33 NSDC occupations with QP codes and NSQF "
+            "levels (including CNC Operator from NCO 2015). Only 4 occupations carry explicit NOS skill links, "
+            "so matches outside those are reported as unscored rather than zero. "
+            "5 state-level sector skill gaps (NSDC 2013) and 5 employer survey findings are available as evidence. "
+            "Try Careers with e.g. 'Data Entry' or 'Communication'.",
             _ev(["job_roles", "occupation_skills", "courses"]),
         )
     if "indicator" in q or "lfpr" in q or "unemployment" in q or "wpr" in q or "plfs" in q:
@@ -202,9 +212,18 @@ def fallback_answer(question, ctx):
     evs = "; ".join(f"{e['metric']}: {e['value']} {e['unit'] or ''}".strip()
                     for e in ctx.get("evidence", [])[:4])
     n_skills = totals.get("unique_skills", len(ctx.get("skills", [])))
+    demand_skills = [s for s in ctx.get("skills", []) if s.get("score") is not None]
+    if demand_skills:
+        demand_list = "; ".join(f"{s['name']}: {s['score']}% ({s['status']})" for s in demand_skills[:5])
+        return (
+            f"Of {n_skills} skills in the catalog, {len(demand_skills)} have observed demand signals from WEF/NASSCOM: "
+            f"{demand_list}. The remaining {n_skills - len(demand_skills)} skills have insufficient source evidence for demand scoring. "
+            f"National aggregates ({evs}) are shown as evidence, never converted into skill scores. See Skill Intelligence.",
+            _ev(["skill_demand", "skills", "evidence_metrics"]),
+        )
     return (
         "Per-skill demand scores cannot be calculated: the source skill_demand assessment is NULL "
-        "for every signal (method: 'Not calculated - insufficient signals'). The catalog holds "
+        "for every signal. The catalog holds "
         f"{n_skills} real skills; national aggregates ({evs}) are shown as evidence, never "
         "converted into skill scores. See Skill Intelligence.",
         _ev(["skill_demand", "skills", "evidence_metrics"]),
