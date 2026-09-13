@@ -23,8 +23,9 @@ from routes.data_routes import bp as data_bp  # noqa: E402
 from routes.district_routes import bp as district_bp  # noqa: E402
 from routes.employer_routes import bp as employer_bp  # noqa: E402
 from routes.skill_routes import bp as skill_bp  # noqa: E402
+from routes.student_routes import bp as student_bp  # noqa: E402
 
-for b in (health_bp, data_bp, skill_bp, course_bp, district_bp, career_bp, employer_bp, ai_bp):
+for b in (health_bp, data_bp, skill_bp, course_bp, district_bp, career_bp, employer_bp, ai_bp, student_bp):
     app.register_blueprint(b)
 
 
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     from services.db import DB_PATH
 
     print(f"[kaushora] database: {DB_PATH}")
-    print(f"[kaushora] dataset: {BASE / 'data' / 'raw' / 'kaushora_real_evidence_dataset.md'}")
+    print(f"[kaushora] dataset: {BASE / 'data' / 'raw' / 'csv' / '01_sources.csv'} (18 CSV + legacy .md preserved)")
     # Debug only when explicitly enabled — never in production.
     debug = os.environ.get("FLASK_DEBUG", "").lower() in {"1", "true", "yes"}
     app.run(host="127.0.0.1", port=int(os.environ.get("PORT", 5000)), debug=debug)

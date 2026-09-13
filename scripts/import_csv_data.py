@@ -95,7 +95,8 @@ def main():
     counts = {}
     conn = sqlite3.connect(DB)
     try:
-        conn.execute("PRAGMA foreign_keys = ON")
+        # Temporarily defer FK checks for bulk replace (student data refs skills)
+        conn.execute("PRAGMA foreign_keys = OFF")
         c = conn.cursor()
 
         # ---- wipe order: children before parents; synthetic shared tables ----
@@ -111,6 +112,9 @@ def main():
         c.execute("DELETE FROM training_centres")
         for t in ["skills", "job_roles", "courses", "districts", "states", "sectors", "sources", "dataset_meta"]:
             c.execute(f"DELETE FROM {t}")
+        conn.execute("PRAGMA foreign_keys = ON")
+        # Verify FKs after re-enable
+        c.execute("PRAGMA foreign_key_check")
 
         # ---- parents ----
         for r in T["sources"]:

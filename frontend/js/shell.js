@@ -11,8 +11,14 @@
     ["careers.html", "Careers", "case", "careers"],
     ["employers.html", "Employers", "bank", "employers"],
   ];
+  const NAV_STUDENT = [
+    ["profile.html", "Create Profile", "user", "profile"],
+    ["student.html", "My Student Dashboard", "case", "student"],
+  ];
   const NAV_SYS = [
+    ["occupation.html", "Occupations", "pulse", "occupation"],
     ["ai.html", "Kaushora AI", "spark", "ai"],
+    ["sources.html", "Sources & Methodology", "db", "sources"],
     ["login.html", "Login", "user", "login"],
   ];
 
@@ -22,7 +28,9 @@
       (active === key ? 'aria-current="page"' : "") + ">" + window.KIcon(ic) +
       "<span>" + label + "</span></a>";
     return (
-      '<div class="nav-label">Ontology &amp; Intelligence</div><nav class="nav" aria-label="Primary">' +
+      '<div class="nav-label">Student</div><nav class="nav" aria-label="Student">' +
+      NAV_STUDENT.map((n) => item(n[0], n[1], n[2], n[3])).join("") +
+      '</nav><div class="nav-label">Ontology &amp; Intelligence</div><nav class="nav" aria-label="Primary">' +
       NAV_MAIN.map((n) => item(n[0], n[1], n[2], n[3])).join("") +
       '</nav><div class="nav-label">Analytical Systems</div><nav class="nav" aria-label="Systems">' +
       NAV_SYS.map((n) => item(n[0], n[1], n[2], n[3])).join("") +

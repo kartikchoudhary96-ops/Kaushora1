@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Occupation — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="occupation">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+  (function(){
+    "use strict";
+    const page=document.getElementById("page");
+    const id=new URLSearchParams(location.search).get("id")||"";
+    async function load(){
+      if(!id){ page.innerHTML=window.KShell.emptyState("No occupation selected","Choose from the Occupations page."); return; }
+      page.innerHTML='<a href="occupation.html" class="btn ghost sm">← All occupations</a><div class="card" style="margin-top:14px"><div class="skel" style="height:280px"></div></div>';
+      try{
+        const [occList, skills, courses, quals] = await Promise.all([
+          window.KaushoraAPI.get("/api/meta/occupations?q="+encodeURIComponent(id)),
+          window.KaushoraAPI.get("/api/skills"),
+          window.KaushoraAPI.get("/api/courses"),
+          window.KaushoraAPI.get("/api/meta/skills") // dummy to keep parallel, not needed
+        ]);
+        const occ=occList.find(o=>o.occupation_id===id)||occList[0];
+        if(!occ) throw new Error("Occupation not found");
+        // fetch occupation_skills and related courses via dedicated endpoint? Use career/roles and course skills
+        const [reqMap, courseMap] = await Promise.all([
+          window.KaushoraAPI.get("/api/careers/roles").then(r=>r.find(x=>x.role_id===id)),
+          window.KaushoraAPI.get("/api/courses").then(cs=>cs.filter(c=>c.sector===occ.sector))
+        ]);
+        render(occ, reqMap, courseMap);
+      }catch(e){ page.innerHTML='<a href="occupation.html" class="btn ghost sm">← All occupations</a><div style="margin-top:14px">'+window.KShell.errorState(e.message,"reload")+ '</div>'; window.reload=()=>load(); }
+    }
+    function render(occ, reqMap, relatedCourses){
+      document.title=occ.occupation_name+" — Kaushora";
+      let h='<a href="occupation.html" class="btn ghost sm">← All occupations</a>';
+      h+='<div class="eyebrow" style="margin-top:14px">'+esc(occ.sector||"")+' · NSQF '+esc(occ.nsqf_level||"")+' · <code>'+esc(occ.occupation_code||occ.occupation_id)+'</code></div>';
+      h+='<h1 class="title">'+esc(occ.occupation_name)+'</h1><p class="subtitle">'+esc(occ.qp_name||"")+' · '+esc(occ.standard_status||"")+'</p>';
+      h+='<div class="grid cols-3"><div class="card kpi"><div class="k-label">Required skills</div><div class="k-value">'+(reqMap&&reqMap.required_skills?reqMap.required_skills.length:"—")+'</div><div class="k-sub">Explicit NOS links</div></div>'+
+        '<div class="card kpi"><div class="k-label">Related qualifications</div><div class="k-value">1</div><div class="k-sub">'+esc(occ.qp_code||"")+'</div></div>'+
+        '<div class="card kpi"><div class="k-label">Sector</div><div class="k-value" style="font-size:18px;padding:10px 0">'+esc(occ.sector||"—")+'</div><div class="k-sub">NSDC sector</div></div></div>';
+      if(reqMap && reqMap.required_skills && reqMap.required_skills.length){
+        h+='<div class="card" style="margin-top:16px"><h3>Required skills (observed)</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'+reqMap.required_skills.map(sid=>'<span class="pill tag-green">'+esc(sid)+'</span>').join("")+'</div><p class="hint">From explicit NOS-coded occupation-skill links (observed, never inferred).</p></div>';
+      } else {
+        h+='<div class="empty">'+window.KIcon("info")+'<h3>No explicit skill requirements published</h3><p>Only 4 of 32 occupations carry published NOS skill links. This occupation shows honestly as unscored.</p></div>';
+      }
+      h+='<div class="card" style="margin-top:16px"><h3>Relevant courses</h3><p class="hint">Same-sector ITI courses with recorded coverage.</p>';
+      if(!relatedCourses.length) h+='<p class="hint">No same-sector courses recorded.</p>';
+      else h+='<div class="table-wrap"><table class="data"><thead><tr><th>Course</th><th>NSQF</th><th></th></tr></thead><tbody>'+relatedCourses.slice(0,6).map(c=>'<tr><td><b>'+esc(c.course_name)+'</b></td><td>'+esc(c.nsqf_level||"")+'</td><td><a class="btn ghost sm" href="course-detail.html?id='+c.id+'">View</a></td></tr>').join("")+'</tbody></table></div>';
+      h+='</div>';
+      h+='<div class="evidence-strip">'+window.KIcon("shield")+'<div><b>Source data (REAL).</b> Occupation registry from NSDC/DGT/DVET; skill links from observed NOS mappings. Unmapped occupations honestly reported.</div></div>';
+      page.innerHTML=h;
+    }
+    function esc(s){ return window.KShell.escapeHtml(s); }
+    load();
+  })();
+  </script>
+</body>
+</html>

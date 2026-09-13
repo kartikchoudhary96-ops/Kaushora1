@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Career Detail — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="student">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+  (function(){
+    "use strict";
+    const page=document.getElementById("page");
+    const pid=new URLSearchParams(location.search).get("profile");
+    const occId=new URLSearchParams(location.search).get("occ");
+    async function load(){
+      if(!pid||!occId){ page.innerHTML=window.KShell.emptyState("Missing context","Open a career from your student dashboard."); return; }
+      page.innerHTML='<a href="student.html?id='+pid+'" class="btn ghost sm">← Back to dashboard</a><div class="card" style="margin-top:14px"><div class="skel" style="height:280px"></div></div>';
+      try{
+        const [analysis, occ, skills]=await Promise.all([
+          window.KaushoraAPI.get("/api/student/"+pid+"/analysis"),
+          window.KaushoraAPI.get("/api/meta/occupations?q="+encodeURIComponent(occId)).then(r=>r.find(x=>x.occupation_id===occId)||r[0]),
+          window.KaushoraAPI.get("/api/meta/skills")
+        ]);
+        const match=analysis.career_matches.find(m=>m.occupation_id===occId);
+        if(!match){ page.innerHTML=window.KShell.emptyState("Not a recommended match for you","This occupation was unscored (no explicit skill links) or not in your top matches."); return; }
+        render(match, analysis, occ);
+      }catch(e){ page.innerHTML=window.KShell.errorState(e.message,"reload"); window.reload=()=>load(); }
+    }
+    function render(m, analysis, occ){
+      let h='<a href="student.html?id='+pid+'" class="btn ghost sm">← Back to dashboard</a>';
+      h+='<div class="eyebrow" style="margin-top:14px">'+esc(m.sector||"")+' · '+esc(m.occupation_code||m.occupation_id)+' · NSQF '+esc(m.nsqf_level||"")+'</div>';
+      h+='<h1 class="title">'+esc(m.occupation_name)+'</h1>';
+      h+='<p class="subtitle">'+esc(m.label)+' — '+m.score+'% match · '+m.coverage+'% skill coverage</p>';
+      h+='<div class="grid cols-3"><div class="card kpi"><div class="k-label">Match score</div><div class="k-value">'+m.score+'%</div><div class="k-sub">'+esc(m.label)+'</div></div>'+
+        '<div class="card kpi"><div class="k-label">Skills matched</div><div class="k-value">'+m.matched_skills.length+'/'+m.required_count+'</div><div class="k-sub">'+m.coverage+'% coverage</div></div>'+
+        '<div class="card kpi"><div class="k-label">Missing</div><div class="k-value">'+m.missing_skills.length+'</div><div class="k-sub">'+m.weak_skills.length+' weak (proficiency)</div></div></div>';
+      h+='<div class="card" style="margin-top:16px"><h3>Why Kaushora matched you</h3><p style="font-size:13px">Interest aligned: <b>'+(m.interest_aligned?"Yes":"No")+'</b> · Education ok: <b>'+(m.education_ok?"Yes":"No")+'</b> · Skills: '+m.matched_skills.join(", ")+'</p><p style="font-size:13px;color:var(--muted)">Method: '+esc(analysis.methodology.match_score)+'</p></div>';
+      h+='<div class="grid cols-2" style="margin-top:16px"><div class="card"><h3>Your current skills</h3><p>'+ (analysis.profile.skills.map(s=>'<span class="pill tag-green">'+esc(s.skill_id)+' ('+esc(s.proficiency_label)+')</span>').join(" ")||'<span style="color:var(--muted)">None</span>') +'</p></div>'+
+        '<div class="card"><h3>Skills you need</h3><p>'+m.missing_skills.map(sid=>'<span class="pill tag-grey">'+esc(sid)+'</span>').join(" ")+'</p><p style="font-size:12px;color:var(--muted)">Weak (have but low proficiency): '+ (m.weak_skills.join(", ")||"none") +'</p></div></div>';
+      const lp=analysis.learning_pathway.filter(x=>m.missing_skills.includes(x.skill_id));
+      h+='<h2 class="section">Suggested learning pathway</h2>';
+      if(!lp.length) h+=window.KShell.emptyState("No mapped course","No recorded ITI course explicitly covers the missing skills.");
+      else h+='<div class="grid" style="gap:12px">'+lp.map(s=>'<div class="card"><b>'+esc(s.skill_name)+'</b><br>'+s.courses.map(c=>'<a href="course-detail.html?id='+c.course_id+'" class="pill tag-green">'+esc(c.course_name)+'</a>').join(" ")+'</div>').join("")+'</div>';
+      // relevant courses
+      h+='<div class="card" style="margin-top:16px"><h3>Relevant courses</h3><p class="hint">From the 15 recorded ITI courses.</p><div class="table-wrap"><table class="data"><thead><tr><th>Course</th><th>Sector</th><th>NSQF</th><th></th></tr></thead><tbody>';
+      // find courses that teach missing skills
+      const courseMap={};
+      lp.forEach(s=>s.courses.forEach(c=>{ courseMap[c.course_id]=c; }));
+      const courses=Object.values(courseMap);
+      if(!courses.length) h+='<tr><td colspan="4">No mapped courses</td></tr>';
+      else courses.forEach(c=>{ h+='<tr><td><b>'+esc(c.course_name)+'</b></td><td>'+esc(c.sector||"")+'</td><td>'+esc(c.nsqf_level||"")+'</td><td><a class="btn ghost sm" href="course-detail.html?id='+c.course_id+'">View</a></td></tr>'; });
+      h+='</tbody></table></div></div>';
+      h+='<div class="evidence-strip">'+window.KIcon("shield")+'<div><b>Sources & Methodology.</b> Occupation requirements from explicit NOS links (observed), course coverage from recorded links, proficiency from your self-reported levels. All rows <code>data_source=REAL</code>.</div></div>';
+      page.innerHTML=h;
+    }
+    function esc(s){ return window.KShell.escapeHtml(s); }
+    load();
+  })();
+  </script>
+</body>
+</html>

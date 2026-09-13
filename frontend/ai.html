@@ -18,27 +18,51 @@
       const PRESETS = [
         "Which skills are most in demand?",
         "Which courses need curriculum review?",
-        "What skills are missing in this course?",
-        "Which districts show the largest training gaps?",
-        "What career paths match my skills?"
+        "What skills am I missing?",
+        "Which districts have training data?",
+        "What career paths match my skills?",
+        "What should I learn next?"
+      ];
+      const QUICK_ACTIONS = [
+        {label:"Explain this insight", q:"Explain why I am seeing this insight and what evidence supports it."},
+        {label:"Why am I seeing this?", q:"Why am I seeing this result? Show the data and method."},
+        {label:"What should I learn next?", q:"What should I learn next based on my profile?"},
+        {label:"Why this career?", q:"Why was this career recommended for me?"},
+        {label:"Which courses help?", q:"Which courses address my skill gaps?"},
+        {label:"Show alternatives", q:"What alternative careers match my profile?"},
       ];
 
+      function getCtx(){
+        const url=new URLSearchParams(location.search);
+        const sid=url.get("student_id")||url.get("id")||localStorage.getItem("kaushora_last_profile")||"";
+        // detect entity from referrer or current context (skill/occupation/course/district pages may link with ?entity=)
+        const ent=url.get("entity")||url.get("type");
+        const eid=url.get("entity_id")||url.get("skill")||url.get("occ")||url.get("course");
+        return {student_id:sid||null, entity:ent||null, entity_id:eid||null};
+      }
       function load() {
+        const ctx=getCtx();
+        let ctxNote="";
+        if(ctx.student_id) ctxNote='<div class="pill tag-green" style="margin-bottom:8px">Student #'+esc(ctx.student_id)+' context attached</div>';
+        else if(ctx.entity) ctxNote='<div class="pill tag-blue" style="margin-bottom:8px">'+esc(ctx.entity)+' '+esc(ctx.entity_id)+' context</div>';
         page.innerHTML =
-          '<div class="eyebrow">Module 09 · Grounded assistant</div><h1 class="title">Kaushora AI</h1>' +
-          '<p class="subtitle">Answers strictly reflect registered catalog data and backend analytics. Statistics are never invented — where evidence is missing, it says so.</p>' +
+          '<div class="eyebrow">Grounded assistant</div><h1 class="title">Kaushora AI</h1>' +
+          '<p class="subtitle">Answers strictly reflect retrieved Kaushora records + derived analytics. Statistics are never invented — where evidence is missing, it says so.</p>' +ctxNote+
           '<div class="chat-wrap"><div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="presets">' +
           PRESETS.map((p) => '<button class="chip preset" data-q="' + esc(p) + '">' + esc(p) + "</button>").join("") + "</div>" +
-          '<div class="chat-log" id="log" aria-live="polite"><div class="bubble ai">Ask about skills, courses, districts or careers. I answer from the live backend — try a preset above.</div></div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="quick">'+
+          QUICK_ACTIONS.map(a=>'<button class="chip" style="background:var(--pistachio-soft)" data-q="'+esc(a.q)+'">'+esc(a.label)+'</button>').join("")+'</div>'+
+          '<div class="chat-log" id="log" aria-live="polite"><div class="bubble ai">Ask about skills, courses, districts or careers — or try a quick action above. I use your profile when available.</div></div>' +
           '<form class="chat-input" id="f"><input id="q" placeholder="Ask a grounded question…" aria-label="Ask Kaushora AI" autocomplete="off" />' +
           '<button class="btn" type="submit" id="go">Query</button></form></div>' +
           '<div><div class="card"><div class="eyebrow">Data inspector</div><h3>Live audit</h3><div id="inspector"><div class="skel" style="height:120px"></div></div></div>' +
           '<div class="card" style="margin-top:16px"><div class="eyebrow">How answers are built</div><h3>Synthesis pipeline</h3>' +
-          '<div class="audit-step"><span class="num">1</span><div><b>Analytics context</b><br><span style="color:var(--muted)">Live dashboard totals + top skills + actions.</span></div></div>' +
-          '<div class="audit-step"><span class="num">2</span><div><b>Grounded prompt</b><br><span style="color:var(--muted)">Model is instructed to use only context numbers.</span></div></div>' +
-          '<div class="audit-step"><span class="num">3</span><div><b>Model or fallback</b><br><span style="color:var(--muted)">Gemini when a key is configured, else a structured evidence summary.</span></div></div>' +
-          '<div class="audit-step"><span class="num">4</span><div><b>Integrity check</b><br><span style="color:var(--muted)">Insufficient-evidence questions get an explicit halt, not a guess.</span></div></div></div></div></div>';
-        document.querySelectorAll(".preset").forEach((b) => b.addEventListener("click", () => { document.getElementById("q").value = b.dataset.q; ask(); }));
+          '<div class="audit-step"><span class="num">1</span><div><b>Retrieve context</b><br><span style="color:var(--muted)">Live DB: profile + matches + gaps + indicators + evidence.</span></div></div>' +
+          '<div class="audit-step"><span class="num">2</span><div><b>Grounded prompt</b><br><span style="color:var(--muted)">Model sees only retrieved numbers.</span></div></div>' +
+          '<div class="audit-step"><span class="num">3</span><div><b>Model or fallback</b><br><span style="color:var(--muted)">Gemini if key, else deterministic summary.</span></div></div>' +
+          '<div class="audit-step"><span class="num">4</span><div><b>Traceability</b><br><span style="color:var(--muted)">Every answer cites source rows.</span></div></div></div>' +
+          '<div class="card" style="margin-top:16px"><div class="eyebrow">Try</div><p style="font-size:13px;margin:0">Append <code>?student_id=1</code> to this URL after creating a profile to get student-aware answers.</p></div></div></div>';
+        document.querySelectorAll(".preset,.chip").forEach((b) => b.addEventListener("click", () => { if(b.dataset.q){ document.getElementById("q").value = b.dataset.q; ask(); } }));
         document.getElementById("f").addEventListener("submit", (e) => { e.preventDefault(); ask(); });
         inspect();
       }
@@ -61,6 +85,7 @@
         const input = document.getElementById("q"), log = document.getElementById("log"), btn = document.getElementById("go");
         const q = input.value.trim();
         if (!q) return;
+        const ctx=getCtx();
         log.insertAdjacentHTML("beforeend", '<div class="bubble user">' + esc(q) + "</div>");
         input.value = "";
         btn.disabled = true; btn.textContent = "…";
@@ -68,9 +93,15 @@
         thinking.className = "bubble ai"; thinking.innerHTML = "<i>Consulting backend analytics…</i>";
         log.appendChild(thinking); log.scrollTop = log.scrollHeight;
         try {
-          const r = await window.KaushoraAPI.aiChat(q);
-          thinking.innerHTML = esc(r.answer) + '<div class="meta">' +
-            (r.ai_available ? "Generated with live model over backend analytics." : esc(r.note || "Structured evidence fallback.")) + "</div>";
+          // forward student/entity context to backend for grounding
+          const payload={question:q};
+          if(ctx.student_id) payload.student_id=ctx.student_id;
+          if(ctx.entity) { payload.entity=ctx.entity; payload.entity_id=ctx.entity_id; }
+          const r = await window.KaushoraAPI.post("/api/ai/chat", payload);
+          let ev="";
+          if(r.evidence && r.evidence.length) ev='<div style="margin-top:8px;font-size:12px;color:var(--muted)">Evidence: '+r.evidence.map(e=>'<span class="pill tag-grey">'+esc(e.source||e.data_source||"REAL")+'</span>').join(" ")+'</div>';
+          thinking.innerHTML = esc(r.answer) + ev + '<div class="meta">' +
+            (r.ai_available ? "Generated with live model over retrieved Kaushora records." : esc(r.note || "Structured grounded fallback.")) + (r.data_source?' · <span class="pill tag-green">'+esc(r.data_source)+'</span>':'') + (r.grounded?' · grounded':'') + "</div>";
         } catch (e) {
           thinking.innerHTML = "<b>Request failed.</b> " + esc(e.message);
         } finally { btn.disabled = false; btn.textContent = "Query"; log.scrollTop = log.scrollHeight; }

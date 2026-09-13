@@ -18,8 +18,13 @@ def _gemini_key():
     return os.environ.get("GEMINI_API_KEY", "").strip()
 
 
-def build_context():
-    """Retrieve relevant Kaushora records for grounding (all live DB reads)."""
+def build_context(student_id=None, entity=None, entity_id=None):
+    """Retrieve relevant Kaushora records for grounding (all live DB reads).
+
+    When student_id is supplied, includes that student's profile + analysis.
+    When entity/entity_id supplied (skill/occupation/course/district), includes
+    that entity's observed records.
+    """
     from .analytics_service import (compute_skill_demand, dashboard_overview,
                                     district_summary, evidence_metrics,
                                     labour_indicators, recommendations_live,
@@ -48,7 +53,7 @@ def build_context():
     scored.sort(key=lambda x: x["score"])
     dist = district_summary()
     with_centres = [d for d in dist if d["training_centres"] > 0]
-    return {
+    ctx = {
         "totals": ov["totals"],
         "weakest_alignments": scored[:5],
         "assessable_courses": len(scored),
@@ -73,6 +78,42 @@ def build_context():
         "trends": [{"technology": t["technology"], "direction": t.get("trend_direction"),
                     "evidence": t.get("evidence")} for t in trend_signals()],
     }
+    # Student-specific context (when on My Student Dashboard / Career Detail)
+    if student_id:
+        try:
+            from .student_service import get_student_analysis
+            an = get_student_analysis(int(student_id))
+            if an:
+                ctx["student"] = {
+                    "profile": {k: an["profile"].get(k) for k in ("id", "status", "district_name", "state_name", "goal", "skills", "interests", "preferences", "education_level")},
+                    "top_matches": [{"occupation": m["occupation_name"], "score": m["score"], "label": m["label"], "coverage": m["coverage"]} for m in an.get("career_matches", [])[:3]],
+                    "prioritized_gaps": an.get("prioritized_gaps", [])[:3],
+                    "next_actions": an.get("next_actions", [])[:3],
+                }
+        except Exception:
+            pass
+    # Entity-specific context (skill/occupation/course/district pages)
+    if entity and entity_id:
+        try:
+            c2 = get_db()
+            try:
+                if entity == "skill":
+                    r = c2.execute("SELECT id, skill_name, skill_category FROM skills WHERE id=?", (entity_id,)).fetchone()
+                    if r: ctx["entity"] = {"type": "skill", "id": r["id"], "name": r["skill_name"], "category": r["skill_category"]}
+                elif entity == "occupation":
+                    r = c2.execute("SELECT role_id, job_title, qp_code FROM job_roles WHERE role_id=?", (entity_id,)).fetchone()
+                    if r: ctx["entity"] = {"type": "occupation", "id": r["role_id"], "name": r["job_title"], "qp": r["qp_code"]}
+                elif entity == "course":
+                    r = c2.execute("SELECT id, course_name, sector FROM courses WHERE id=?", (entity_id,)).fetchone()
+                    if r: ctx["entity"] = {"type": "course", "id": r["id"], "name": r["course_name"], "sector": r["sector"]}
+                elif entity == "district":
+                    r = c2.execute("SELECT district_id, district_name, district_code FROM districts WHERE district_id=?", (entity_id,)).fetchone()
+                    if r: ctx["entity"] = {"type": "district", "id": r["district_id"], "name": r["district_name"]}
+            finally:
+                c2.close()
+        except Exception:
+            pass
+    return ctx
 
 
 def _ev(names):
@@ -83,6 +124,29 @@ def fallback_answer(question, ctx):
     """Deterministic grounded answers from live context (no model needed)."""
     q = (question or "").lower()
     totals = ctx.get("totals", {})
+    # Student-specific shortcuts (highest priority when student context present)
+    student = ctx.get("student")
+    if student and any(k in q for k in ("my profile", "my skills", "my gaps", "my career", "what should i learn", "why was this career", "what skills am i missing")):
+        prof = student.get("profile", {})
+        gaps = student.get("prioritized_gaps", [])
+        nxt = student.get("next_actions", [])
+        matches = student.get("top_matches", [])
+        if "what should i learn" in q or "what skills am i missing" in q:
+            if not gaps:
+                return ("You have no prioritized gaps for your top matches — your current skills cover the required explicit NOS links.", _ev(["student_analysis"]))
+            g = gaps[0]
+            return (f"Top gap for you is {g['skill_name']} ({g['skill_id']}). " + (f"Next action: {nxt[0]['action']} — {nxt[0]['reason']}" if nxt else ""),
+                    _ev(["student_analysis", "occupation_skills"]))
+        if "why was this career" in q or "why was this occupation" in q:
+            if matches:
+                m = matches[0]
+                return (f"Top match {m['occupation']} ({m['score']}% {m['label']}, {m['coverage']}% coverage) was chosen for your status {prof.get('status')} and interests {', '.join(prof.get('interests', [])[:2])}. See Career Matches for the full why.",
+                        _ev(["student_analysis"]))
+        # general student summary
+        return (f"Profile #{prof.get('id')} — {prof.get('status')} in {prof.get('district_name') or '—'}. "
+                f"Top match: {matches[0]['occupation'] if matches else 'none'} "
+                f"({matches[0]['label'] if matches else ''}). Gaps: {', '.join(g['skill_name'] for g in gaps[:2]) or 'none'}.",
+                _ev(["student_analysis"]))
     if "district" in q or "nagpur" in q or "training centre" in q or "capacity" in q:
         named = "; ".join(
             f"{d['district']}: {d['centres']} centre(s)" + (
@@ -156,8 +220,12 @@ SYSTEM_PROMPT = (
 )
 
 
-def ask_ai(question, context=None):
-    ctx = build_context()
+def ask_ai(question, context=None, student_id=None, entity=None, entity_id=None):
+    # context param kept for backward compat (ignored — build_context is source of truth)
+    ctx = build_context(student_id=student_id, entity=entity, entity_id=entity_id)
+    # also merge any caller-supplied context (e.g. legacy tests)
+    if context and isinstance(context, dict):
+        ctx.update({k: v for k, v in context.items() if k not in ctx})
     key = _gemini_key()
     if not key:
         answer, evidence = fallback_answer(question, ctx)

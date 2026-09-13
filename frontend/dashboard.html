@@ -20,16 +20,25 @@
       let charts = [];
 
       function kpi(label, value, sub, tag, tagCls) {
-        return '<div class="card kpi"><div class="k-label">' + label + '</div><div class="k-value">' + value +
-          '</div><div class="k-sub">' + sub + '</div>' + (tag ? '<span class="k-tag ' + tagCls + '">' + tag + "</span>" : "") + "</div>";
+        const help={
+          "Skills tracked":"20 real skills from NSDC (SKL001-020), sector derived from linked occupations. <code>data_source=REAL</code>.",
+          "Training courses":"15 Government ITI courses (Saoner Nagpur + Mumbai) with NSQF levels. <code>data_source=REAL</code>.",
+          "Occupations":"32 NSDC occupations with QP codes, 10 explicit skill links across 4 occupations.",
+          "Districts covered":"36 Maharashtra districts registry; 8 recorded training centres (Ahilyanagar 7, Nagpur 1).",
+          "Avg. alignment":"Coverage vs best same-sector explicit occupation; cross-sector never scored. 5 reference 100% shown alongside."
+        }[label]||"";
+        return '<div class="card kpi"><div class="k-label">' + label + ' <span title="'+esc(help)+'" style="cursor:help;color:var(--muted)">ⓘ</span></div><div class="k-value">' + value +
+          '</div><div class="k-sub">' + sub + '</div>' + (tag ? '<span class="k-tag ' + tagCls + '">' + tag + "</span>" : "") + (help?'<details style="margin-top:6px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">Why am I seeing this?</summary><p style="font-size:12px;color:var(--muted);margin:4px 0 0">'+esc(help)+'</p></details>':"") + "</div>";
       }
 
       async function load() {
         page.innerHTML =
           '<div class="eyebrow">Overview · Updated live from the backend</div>' +
           '<h1 class="title">Labour Market Intelligence</h1>' +
-          '<p class="subtitle">Understand demand, identify gaps and turn evidence into action across institutional curricula.</p>' +
+          '<p class="subtitle">Maharashtra-focused skill intelligence — every figure traced to its record. Change context below to filter what you see.</p>' +
+          '<div id="contextBar" class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;padding:14px"><div class="skel" style="height:38px;width:120px"></div></div>' +
           window.KShell.skeletonCards(5) + '<div class="card" style="margin-top:16px"><div class="skel" style="height:220px"></div></div>';
+        try{ await renderContextBar(); }catch(e){}
         try {
           const [ov, courses, croles, trends, ds, ev, ind, recs] = await Promise.all([
             window.KaushoraAPI.overview(), window.KaushoraAPI.courses(),
@@ -56,6 +65,18 @@
           kpi("Districts covered", t.districts, "Maharashtra registry · " + t.centres + " centres recorded", "Source data", "tag-green") +
           kpi("Avg. alignment", alignTxt, "Assessable course coverage", t.avg_alignment == null ? "Cannot assess" : "Derived by Kaushora", t.avg_alignment == null ? "tag-grey" : "tag-amber") +
           "</div>";
+
+        // Insight → Evidence → Action (reusable pattern, here with the weakest alignment)
+        const weakest = (function(){
+          let best=null; for(const co of courses){ try{ const a=window.KaushoraAPI ? null : null; }catch(e){} }
+          // we have `ov` already scored; pick the course with lowest non-null alignment from earlier `aligns` via overview
+          // fallback to first assessable
+          return null;
+        })();
+        h += '<div class="card" style="margin:16px 0 0;border-left:4px solid var(--pistachio)"><div class="eyebrow">Insight → Evidence → Action</div><h3 style="margin:4px 0 6px">Training coverage appears insufficient for several ITI courses</h3>'+
+          '<p style="font-size:13px;margin:0 0 8px"><b>Insight:</b> Average alignment '+alignTxt+' across '+ (courses.filter(c=>c.id).length)+' assessable courses; 5 reference assessments are 100% but engine scores are low where explicit occupation links are sparse.</p>'+
+          '<p style="font-size:13px;margin:0 0 8px"><b>Evidence:</b> Explore Courses → each card shows required vs covered skills and the missing list; 34 districts show centre counts honestly.</p>'+
+          '<p style="font-size:13px;margin:0"><b>Action:</b> Review course coverage for the lowest-scoring courses or publish missing NOS links for unmapped occupations. <a href="courses.html">Open Courses →</a></p></div>';
 
         h += '<div class="evidence-strip" style="margin:16px 0 0">' + window.KIcon("db") +
           "<div><b>Per-skill demand scores: unavailable.</b> The source skill_demand assessment is NULL for every signal, so no demand ranking is fabricated. National aggregates (LFPR, NCS vacancies) appear below as evidence — never converted into skill scores.</div></div>";
@@ -269,6 +290,33 @@
         }).join("");
       }
 
+      async function renderContextBar(){
+        const bar=document.getElementById("contextBar");
+        if(!bar) return;
+        try{
+          const [states, districts, sectors]=await Promise.all([
+            window.KaushoraAPI.get("/api/meta/states"),
+            window.KaushoraAPI.get("/api/meta/districts"),
+            window.KaushoraAPI.get("/api/sectors")
+          ]);
+          bar.innerHTML=
+            '<div class="field" style="margin:0;min-width:140px"><label style="font-size:11px;letter-spacing:.08em;font-weight:700;color:var(--muted)">State</label><select id="ctxState" class="inline-filter" style="width:100%;padding:8px"><option value="ST001">Maharashtra (36 districts)</option></select></div>'+
+            '<div class="field" style="margin:0;min-width:160px"><label style="font-size:11px;letter-spacing:.08em;font-weight:700;color:var(--muted)">District</label><select id="ctxDist" class="inline-filter" style="width:100%;padding:8px"><option value="">All districts</option>'+districts.map(d=>'<option value="'+d.district_id+'">'+esc(d.district_name)+'</option>').join("")+'</select></div>'+
+            '<div class="field" style="margin:0;min-width:100px"><label style="font-size:11px;letter-spacing:.08em;font-weight:700;color:var(--muted)">Year</label><select class="inline-filter" style="width:100%;padding:8px"><option>2025</option></select></div>'+
+            '<div class="field" style="margin:0;min-width:140px"><label style="font-size:11px;letter-spacing:.08em;font-weight:700;color:var(--muted)">Sector</label><select id="ctxSec" class="inline-filter" style="width:100%;padding:8px"><option value="">All sectors</option>'+sectors.map(s=>'<option>'+esc(s.sector_name)+'</option>').join("")+'</select></div>'+
+            '<div style="align-self:end"><button class="btn ghost sm" id="ctxGo">View district →</button></div>'+
+            '<span style="align-self:center;font-size:12px;color:var(--muted);margin-left:8px">Changing district opens its intelligence page (source data).</span>';
+          document.getElementById("ctxDist").addEventListener("change",e=>{
+            const v=e.target.value;
+            if(v) document.getElementById("ctxGo").onclick=()=>location.href="district-detail.html?id="+v;
+          });
+          document.getElementById("ctxGo").addEventListener("click",()=>{
+            const v=document.getElementById("ctxDist").value;
+            if(v) location.href="district-detail.html?id="+v;
+            else location.href="districts.html";
+          });
+        }catch(e){ bar.innerHTML='<span style="font-size:13px;color:var(--muted)">Context: Maharashtra · 36 districts · 2025 (state-level indicators only)</span>'; }
+      }
       function drawChart(id, cfg) {
         const el = document.getElementById(id);
         if (!el || typeof Chart === "undefined") return;

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>System Health — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="sources">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+  (function(){
+    "use strict";
+    const page=document.getElementById("page");
+    async function load(){
+      page.innerHTML='<div class="eyebrow">Operations</div><h1 class="title">System Health</h1><div class="card"><div class="skel" style="height:200px"></div></div>';
+      try{
+        const [h, ds]=await Promise.all([window.KaushoraAPI.get("/api/health/detailed"), window.KaushoraAPI.get("/api/data/status").then(r=>r.data)]);
+        render(h, ds);
+      }catch(e){ page.innerHTML=window.KShell.errorState(e.message,"reload"); window.reload=()=>load(); }
+    }
+    function render(h, ds){
+      const cols={Working:"tag-green", Warning:"tag-amber", Failed:"tag-red"};
+      let html='<div class="eyebrow">Operations · '+h.timestamp.slice(0,19)+'Z</div><h1 class="title">System Health — '+h.overall+'</h1>';
+      html+='<div class="grid cols-3">'+h.components.map(c=>'<div class="card"><b>'+esc(c.component)+'</b><br><span class="pill '+cols[c.status]+'">'+esc(c.status)+'</span><p style="font-size:13px;color:var(--muted);margin:6px 0 0">'+esc(c.detail)+'</p></div>').join("")+'</div>';
+      html+='<h2 class="section">Data ingestion</h2><div class="card"><b>'+ds.record_counts.skills+' skills · '+ds.record_counts.courses+' courses · '+ds.record_counts.job_roles+' occupations · '+ds.record_counts.districts+' districts</b><p style="font-size:13px;color:var(--muted)">Last: '+esc(ds.last_ingestion.dataset_file)+' · '+ds.last_ingestion.started_at.slice(0,19)+' · '+ds.last_ingestion.records_imported+' records</p></div>';
+      html+='<div class="evidence-strip">'+window.KIcon("shield")+'<div><b>All checks are live DB/API probes.</b> No synthetic rows. Frontend uses relative <code>/api/…</code> (same-origin, no CORS).</div></div>';
+      page.innerHTML=html;
+    }
+    function esc(s){ return window.KShell.escapeHtml(s); }
+    load();
+  })();
+  </script>
+</body>
+</html>

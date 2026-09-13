@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Occupations — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="occupation">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+  (function(){
+    "use strict";
+    const page=document.getElementById("page");
+    let all=[], sectors=[];
+    async function load(){
+      page.innerHTML='<div class="eyebrow">Occupation intelligence</div><h1 class="title">Occupations</h1><div class="card"><div class="skel" style="height:120px"></div></div><div class="card" style="margin-top:16px"><div class="skel" style="height:300px"></div></div>';
+      try{
+        const [occs, secs]=await Promise.all([window.KaushoraAPI.get("/api/meta/occupations"), window.KaushoraAPI.get("/api/sectors")]);
+        all=occs; sectors=secs;
+        renderShell(); apply();
+      }catch(e){ page.innerHTML=window.KShell.errorState(e.message,"reload"); window.reload=()=>load(); }
+    }
+    function renderShell(){
+      page.innerHTML='<div class="eyebrow">Occupation intelligence · '+all.length+' NSQF occupations (source data)</div><h1 class="title">Occupations</h1><p class="subtitle">32 NSDC occupations with QP codes and NSQF levels. Only 4 carry explicit NOS skill links — the rest show honestly as unscored.</p>'+
+        '<div class="card"><div class="grid cols-3" style="align-items:end"><div class="field" style="margin:0"><label for="q">Search</label><div class="searchbar">'+window.KIcon("search")+'<input id="q" type="search" placeholder="e.g. Electrician, Fitter, Data Entry" /></div></div>'+
+        '<div class="field" style="margin:0"><label for="fSec">Sector</label><select id="fSec" class="inline-filter" style="width:100%;padding:10px"><option value="">All sectors</option>'+sectors.map(s=>'<option>'+window.KShell.escapeHtml(s.sector_name)+'</option>').join("")+'</select></div>'+
+        '<div class="field" style="margin:0"><label for="fNsqf">NSQF</label><select id="fNsqf" class="inline-filter" style="width:100%;padding:10px"><option value="">All</option><option>3</option><option>3.5</option><option>4</option></select></div></div></div>'+
+        '<div id="tbl" style="margin-top:16px"></div><div class="evidence-strip">'+window.KIcon("shield")+'<div><b>Source data (REAL).</b> Occupation registry from NSDC/DGT/DVET. Explicit skill requirements (10 links across 4 occupations) drive gap analysis.</div></div>';
+      document.getElementById("q").addEventListener("input",apply);
+      document.getElementById("fSec").addEventListener("change",apply);
+      document.getElementById("fNsqf").addEventListener("change",apply);
+    }
+    function apply(){
+      const q=(document.getElementById("q").value||"").toLowerCase();
+      const sec=document.getElementById("fSec").value;
+      const lv=document.getElementById("fNsqf").value;
+      const rows=all.filter(o=> (!q||o.occupation_name.toLowerCase().includes(q)||o.occupation_code.toLowerCase().includes(q)) && (!sec||o.sector===sec) && (!lv||String(o.nsqf_level)===lv));
+      const el=document.getElementById("tbl");
+      if(!rows.length){ el.innerHTML=window.KShell.emptyState("No occupations match","Try clearing filters."); return; }
+      el.innerHTML='<div class="table-wrap"><table class="data"><thead><tr><th>Occupation</th><th>Sector</th><th>NSQF</th><th>QP Code</th><th></th></tr></thead><tbody>'+
+        rows.map(o=>'<tr><td><b>'+esc(o.occupation_name)+'</b><br><span style="color:var(--muted);font-size:12px">'+esc(o.occupation_code||o.occupation_id)+'</span></td><td>'+esc(o.sector||"—")+'</td><td>'+esc(o.nsqf_level||"—")+'</td><td><code>'+esc(o.qp_code||"")+'</code></td><td><a class="btn ghost sm" href="occupation-detail.html?id='+encodeURIComponent(o.occupation_id)+'">View</a></td></tr>').join("")+'</tbody></table></div>';
+    }
+    function esc(s){ return window.KShell.escapeHtml(s); }
+    load();
+  })();
+  </script>
+</body>
+</html>
