@@ -7,16 +7,19 @@ skill_demand assessment is NULL for every signal).
 GET /api/indicators — PLFS labour-market indicators (observed).
 GET /api/evidence — citable evidence metrics (observed).
 GET /api/recommendations — provided + engine recommendations (derived).
+GET /api/jobs — job market intelligence from real LinkedIn postings.
 """
 from flask import Blueprint, jsonify
 from services.analytics_service import (META, compute_skill_demand, evidence_metrics,
-                                        labour_indicators, recommendations_live, trend_signals)
+                                        labour_indicators, recommendations_live,
+                                        trend_signals, vacancy_evidence)
 from services.db import get_db
 
 bp = Blueprint("data_status", __name__)
 
 TABLES = ["job_roles", "skills", "courses", "course_skills", "curriculum", "trends",
-          "job_postings", "placements", "district_capacity", "training_centres", "employer_surveys",
+          "job_postings", "job_posting_skills", "job_posting_occupations",
+          "placements", "district_capacity", "training_centres", "employer_surveys",
           "sources", "states", "districts", "sectors", "occupation_skills", "qualifications",
           "labour_indicators", "evidence_metrics", "skill_demand", "district_skill_gaps",
           "curriculum_alignment_ref", "recommendations"]
@@ -140,5 +143,53 @@ def recommendations():
         "data": rows,
         "meta": {"source": META["source"], "record_count": len(rows),
                  "note": "Provided rows: dataset compiler derivations. Engine rows: Kaushora derivations from live evidence (marked engine:true)."},
+        "error": None,
+    })
+
+
+@bp.get("/api/jobs")
+def job_market():
+    """Job market intelligence from 2,500 real LinkedIn postings (Role Radar, Apache 2.0).
+    Optional filters: ?state=X&sector=X&skill=X&limit=N"""
+    from flask import request
+    vac = vacancy_evidence()
+    state_f = request.args.get("state") or None
+    sector_f = request.args.get("sector") or None
+    skill_f = request.args.get("skill") or None
+    limit = min(int(request.args.get("limit", 50)), 200)
+    c = get_db()
+    try:
+        q = "SELECT * FROM job_postings WHERE 1=1"
+        params = []
+        if state_f:
+            q += " AND state LIKE ?"
+            params.append(f"%{state_f}%")
+        if sector_f:
+            q += " AND sector LIKE ?"
+            params.append(f"%{sector_f}%")
+        if skill_f:
+            q += " AND skill_ids LIKE ?"
+            params.append(f"%{skill_f}%")
+        q += f" ORDER BY scraped_at DESC LIMIT ?"
+        params.append(limit)
+        postings = [dict(r) for r in c.execute(q, params).fetchall()]
+    finally:
+        c.close()
+    return jsonify({
+        "success": True,
+        "data": {
+            "summary": {
+                "total": vac.get("total", 0),
+                "maharashtra": vac.get("maharashtra", 0),
+                "source": vac.get("source", ""),
+                "period": vac.get("period", ""),
+            },
+            "by_state": vac.get("by_state", []),
+            "by_sector": vac.get("by_sector", []),
+            "top_skills": vac.get("top_skills", []),
+            "by_employment": vac.get("by_employment", []),
+            "postings": postings,
+        },
+        "meta": {"source": "Role Radar (HuggingFace, Apache 2.0)", "record_count": len(postings)},
         "error": None,
     })

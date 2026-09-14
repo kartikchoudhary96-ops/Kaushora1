@@ -388,6 +388,17 @@ def career_analyze(payload):
             via = ", ".join([cc["course_name"] for cc in rec_courses if m["skill_id"] in cc["covers"]][:2])
             pathway.append(f"Learn {m['skill_name']}" + (f" via {via}." if via else " — no course in the current catalog covers it yet."))
     trends = _rows("SELECT technology, evidence, trend_direction FROM trends")
+    # Vacancy evidence from real job postings
+    c2 = get_db()
+    try:
+        vac_total = c2.execute("SELECT COUNT(*) c FROM job_postings").fetchone()["c"]
+        vac_skills = [dict(r) for r in c2.execute("""
+            SELECT s.skill_name, COUNT(*) c FROM job_posting_skills jps
+            JOIN skills s ON jps.skill_id = s.id
+            GROUP BY jps.skill_id ORDER BY c DESC LIMIT 8
+        """).fetchall()] if vac_total > 0 else []
+    finally:
+        c2.close()
     return {
         "recommended_roles": top_roles,
         "unscored_roles": unscored,
@@ -396,6 +407,13 @@ def career_analyze(payload):
         "trend_context": [
             {"technology": t["technology"], "direction": t.get("trend_direction"), "evidence": t.get("evidence")} for t in trends
         ],
+        "vacancy_evidence": {
+            "total_postings": vac_total,
+            "top_skills": vac_skills,
+            "source": "Role Radar (HuggingFace, Apache 2.0)" if vac_total > 0 else None,
+        },
         "evidence_note": "Matched against NSDC occupations with explicit NOS skill links and ITI course coverage "
-        "(Kaushora real public CSV dataset — PLFS/NSDC/MSDE/DGT/DVET sources). No employment guarantee.",
+        "(Kaushora real public CSV dataset — PLFS/NSDC/MSDE/DGT/DVET sources). "
+        f"{vac_total} real LinkedIn job postings provide additional vacancy evidence." if vac_total > 0 else
+        "No employment guarantee.",
     }

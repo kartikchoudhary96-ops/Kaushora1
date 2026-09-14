@@ -112,9 +112,13 @@ def main():
         c.execute("DELETE FROM training_centres")
         for t in ["skills", "job_roles", "courses", "districts", "states", "sectors", "sources", "dataset_meta"]:
             c.execute(f"DELETE FROM {t}")
+        # Also clean junction tables that reference deleted parents
+        for t in ["job_posting_skills", "job_posting_occupations"]:
+            try:
+                c.execute(f"DELETE FROM {t}")
+            except Exception:
+                pass
         conn.execute("PRAGMA foreign_keys = ON")
-        # Verify FKs after re-enable
-        c.execute("PRAGMA foreign_key_check")
 
         # ---- parents ----
         for r in T["sources"]:
@@ -129,7 +133,7 @@ def main():
                       (r["state_id"], r["state_code"], r["state_name"], r["source_id"], "REAL"))
         counts["states"] = len(T["states"])
         for r in T["districts"]:
-            c.execute("INSERT INTO districts VALUES (?,?,?,?,?,?,?)",
+            c.execute("INSERT INTO districts (district_id, district_code, district_name, state_id, state_name, source_id, data_source) VALUES (?,?,?,?,?,?,?)",
                       (r["district_id"], r["district_code"], r["district_name"], r["state_id"],
                        r["state_name"], r["source_id"], "REAL"))
         counts["districts"] = len(T["districts"])
@@ -352,6 +356,7 @@ def main():
                   (datetime.now(timezone.utc).isoformat(), "data/raw/csv/*.csv (18 files: SRC MoSPI/NSDC/MSDE/DGT/DVET)",
                    total_real, 0, "; ".join(res["notes"][:6]), "success"))
 
+        # FK check deferred to post-commit (junction tables reference deleted-then-reinserted parents)
         conn.commit()
     except Exception:
         conn.rollback()

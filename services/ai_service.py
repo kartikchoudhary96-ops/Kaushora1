@@ -28,11 +28,12 @@ def build_context(student_id=None, entity=None, entity_id=None):
     from .analytics_service import (compute_skill_demand, dashboard_overview,
                                     district_summary, evidence_metrics,
                                     labour_indicators, recommendations_live,
-                                    trend_signals)
+                                    trend_signals, vacancy_evidence)
     from .skill_gap_service import course_alignment
     from .db import get_db
 
     ov = dashboard_overview()
+    vac = vacancy_evidence()
     c = get_db()
     try:
         courses = [dict(r) for r in c.execute(
@@ -86,6 +87,14 @@ def build_context(student_id=None, entity=None, entity_id=None):
                     "status": s["demand_status"], "score": s.get("demand_score")} for s in compute_skill_demand()],
         "trends": [{"technology": t["technology"], "direction": t.get("trend_direction"),
                     "evidence": t.get("evidence")} for t in trend_signals()],
+        "vacancy": {
+            "total": vac.get("total", 0),
+            "maharashtra": vac.get("maharashtra", 0),
+            "top_skills": vac.get("top_skills", [])[:5],
+            "by_sector": vac.get("by_sector", [])[:5],
+            "source": vac.get("source", ""),
+            "period": vac.get("period", ""),
+        },
     }
     # Student-specific context (when on My Student Dashboard / Career Detail)
     if student_id:
@@ -185,13 +194,15 @@ def fallback_answer(question, ctx):
             _ev(["course_skills", "occupation_skills", "curriculum_alignment_ref"]),
         )
     if "career" in q or "occupation" in q or "job role" in q or "qp " in q:
+        vac = ctx.get("vacancy", {})
+        vac_note = f" {vac['total']} real job postings from Role Radar provide vacancy evidence." if vac.get("total", 0) > 0 else ""
         return (
             "Career matching compares your skills against 33 NSDC occupations with QP codes and NSQF "
             "levels (including CNC Operator from NCO 2015). Only 4 occupations carry explicit NOS skill links, "
-            "so matches outside those are reported as unscored rather than zero. "
+            f"so matches outside those are reported as unscored rather than zero.{vac_note} "
             "5 state-level sector skill gaps (NSDC 2013) and 5 employer survey findings are available as evidence. "
             "Try Careers with e.g. 'Data Entry' or 'Communication'.",
-            _ev(["job_roles", "occupation_skills", "courses"]),
+            _ev(["job_roles", "occupation_skills", "courses", "job_postings"]),
         )
     if "indicator" in q or "lfpr" in q or "unemployment" in q or "wpr" in q or "plfs" in q:
         inds = "; ".join(f"{i['name']} {i['value']}{i['unit'] or ''} ({i['group']})" for i in ctx.get("indicators", [])[:6])
@@ -199,9 +210,18 @@ def fallback_answer(question, ctx):
                 f"so these figures are never downscaled to districts.",
                 _ev(["labour_indicators"]))
     if "trend" in q or "emerg" in q or "growing" in q or "ncs" in q or "vacanc" in q:
+        vac = ctx.get("vacancy", {})
+        if vac.get("total", 0) > 0:
+            top_sk = "; ".join(f"{s['skill_name']} ({s['c']} postings)" for s in vac.get("top_skills", [])[:5])
+            top_sect = "; ".join(f"{s['sector']} ({s['c']})" for s in vac.get("by_sector", [])[:4])
+            return (
+                f"Job market intelligence from {vac['total']} real LinkedIn postings ({vac['source']}, {vac['period']}): "
+                f"{vac['maharashtra']} in Maharashtra. Top demanded skills: {top_sk}. "
+                f"Top sectors: {top_sect}. WEF trend signals are qualitative sector-level evidence.",
+                _ev(["job_postings", "job_posting_skills", "evidence_metrics"]),
+            )
         evs = "; ".join(f"{e['metric']}: {e['value']} {e['unit'] or ''} ({e['geography']})" for e in ctx.get("evidence", [])[:4])
-        return (f"Recorded evidence: {evs}. WEF trend signals are qualitative sector-level evidence, "
-                f"not skill-level measurements.",
+        return (f"Recorded evidence: {evs}. No job posting microdata available yet.",
                 _ev(["evidence_metrics", "trends"]))
     if "recommend" in q or "action" in q or "priority" in q or "gap" in q:
         recs = "; ".join(f"[{r['priority']}] {r['text']}" for r in ctx.get("recommendations", [])[:4])
@@ -212,21 +232,23 @@ def fallback_answer(question, ctx):
     evs = "; ".join(f"{e['metric']}: {e['value']} {e['unit'] or ''}".strip()
                     for e in ctx.get("evidence", [])[:4])
     n_skills = totals.get("unique_skills", len(ctx.get("skills", [])))
+    vac = ctx.get("vacancy", {})
+    vac_txt = f" {vac.get('total', 0)} real job postings provide vacancy evidence." if vac.get("total", 0) > 0 else ""
     demand_skills = [s for s in ctx.get("skills", []) if s.get("score") is not None]
     if demand_skills:
         demand_list = "; ".join(f"{s['name']}: {s['score']}% ({s['status']})" for s in demand_skills[:5])
         return (
             f"Of {n_skills} skills in the catalog, {len(demand_skills)} have observed demand signals from WEF/NASSCOM: "
-            f"{demand_list}. The remaining {n_skills - len(demand_skills)} skills have insufficient source evidence for demand scoring. "
+            f"{demand_list}. The remaining {n_skills - len(demand_skills)} skills have insufficient source evidence for demand scoring.{vac_txt} "
             f"National aggregates ({evs}) are shown as evidence, never converted into skill scores. See Skill Intelligence.",
-            _ev(["skill_demand", "skills", "evidence_metrics"]),
+            _ev(["skill_demand", "skills", "evidence_metrics", "job_postings"]),
         )
     return (
         "Per-skill demand scores cannot be calculated: the source skill_demand assessment is NULL "
         "for every signal. The catalog holds "
         f"{n_skills} real skills; national aggregates ({evs}) are shown as evidence, never "
-        "converted into skill scores. See Skill Intelligence.",
-        _ev(["skill_demand", "skills", "evidence_metrics"]),
+        f"converted into skill scores.{vac_txt} See Skill Intelligence.",
+        _ev(["skill_demand", "skills", "evidence_metrics", "job_postings"]),
     )
 
 

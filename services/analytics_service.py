@@ -98,17 +98,65 @@ def role_skill_map():
 
 
 def job_skill_counts():
-    # No job-posting table in the CSV source; job_postings stays empty.
+    """Skill demand from real job postings (Role Radar, 2,500 LinkedIn postings).
+    Uses junction table for precise skill–job links."""
+    c = get_db()
+    try:
+        cnt = Counter()
+        by_district = defaultdict(Counter)
+        by_sector = defaultdict(Counter)
+        for r in c.execute("""
+            SELECT jps.skill_id, jp.district, jp.sector
+            FROM job_posting_skills jps
+            JOIN job_postings jp ON jps.job_id = jp.id
+        """).fetchall():
+            cnt[r["skill_id"]] += 1
+            by_district[r["district"] or "Unknown"][r["skill_id"]] += 1
+            by_sector[r["sector"] or "UNK"][r["skill_id"]] += 1
+    finally:
+        c.close()
     jobs = _rows("SELECT * FROM job_postings")
-    cnt = Counter()
-    by_district = defaultdict(Counter)
-    by_sector = defaultdict(Counter)
-    for j in jobs:
-        for sid in split_ids(j.get("skill_ids")):
-            cnt[sid] += 1
-            by_district[(j.get("district") or "Unknown")][sid] += 1
-            by_sector[(j.get("sector") or "UNK")][sid] += 1
     return jobs, cnt, by_district, by_sector
+
+
+def vacancy_evidence():
+    """Aggregate vacancy evidence from real job postings for dashboard/AI."""
+    c = get_db()
+    try:
+        total = c.execute("SELECT COUNT(*) c FROM job_postings").fetchone()["c"]
+        if total == 0:
+            return {"total": 0, "source": "Role Radar (HuggingFace)", "note": "No job postings ingested."}
+        by_state = [dict(r) for r in c.execute("""
+            SELECT state, COUNT(*) c FROM job_postings
+            GROUP BY state ORDER BY c DESC LIMIT 10
+        """).fetchall()]
+        by_sector = [dict(r) for r in c.execute("""
+            SELECT sector, COUNT(*) c FROM job_postings
+            GROUP BY sector ORDER BY c DESC LIMIT 10
+        """).fetchall()]
+        by_skill = [dict(r) for r in c.execute("""
+            SELECT s.skill_name, s.id skill_id, COUNT(*) c
+            FROM job_posting_skills jps
+            JOIN skills s ON jps.skill_id = s.id
+            GROUP BY jps.skill_id ORDER BY c DESC LIMIT 10
+        """).fetchall()]
+        by_emp = [dict(r) for r in c.execute("""
+            SELECT employment_type, COUNT(*) c FROM job_postings
+            GROUP BY employment_type ORDER BY c DESC
+        """).fetchall()]
+        mh_count = c.execute("SELECT COUNT(*) c FROM job_postings WHERE state='Maharashtra'").fetchone()["c"]
+        return {
+            "total": total,
+            "maharashtra": mh_count,
+            "source": "Role Radar (HuggingFace, Apache 2.0)",
+            "period": "2026-04 to 2026-05",
+            "by_state": by_state,
+            "by_sector": by_sector,
+            "top_skills": by_skill,
+            "by_employment": by_emp,
+        }
+    finally:
+        c.close()
 
 
 def employer_stats():
@@ -461,13 +509,10 @@ def dashboard_overview():
              "reason": (t.get("evidence") or "")[:160]}
         )
     if not jobs:
-        ncs = next((e for e in _rows(
-            "SELECT metric_value, unit FROM evidence_metrics WHERE evidence_id='EV008'") or []), None)
-        ncs_txt = f"{ncs['metric_value']} {ncs['unit']}" if ncs else "published aggregates"
         actions.append({
             "type": "data", "priority": "Low",
-            "title": "No job-posting records in the source dataset",
-            "reason": f"The CSV source carries no vacancy microdata; NCS aggregate vacancies ({ncs_txt}) shown as evidence.",
+            "title": "Job-posting data available",
+            "reason": f"{jobs} real LinkedIn job postings from Role Radar (HuggingFace, Apache 2.0) are now available. See Job Market Intelligence.",
         })
     return {
         "totals": {
@@ -499,10 +544,20 @@ def dashboard_overview():
 
 def trends_data():
     trends = trend_signals()
+    # Monthly postings from real job data (scraped dates)
+    c = get_db()
+    try:
+        monthly = [dict(r) for r in c.execute("""
+            SELECT substr(scraped_at, 1, 7) month, COUNT(*) c
+            FROM job_postings WHERE scraped_at IS NOT NULL
+            GROUP BY month ORDER BY month
+        """).fetchall()]
+    finally:
+        c.close()
     return {
-        "monthly_postings": [],
+        "monthly_postings": monthly,
         "growing_skills": [],
         "declining_skills": [],
         "trend_signals": trends,
-        "note": "No vacancy time series in the source dataset. WEF signals are qualitative sector-level evidence, not skill-level measurements.",
+        "note": "Monthly postings from 2,500 real LinkedIn job postings (Role Radar, 2026-04/05). WEF signals are qualitative sector-level evidence.",
     }

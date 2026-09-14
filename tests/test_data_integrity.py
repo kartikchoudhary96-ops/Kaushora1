@@ -63,11 +63,17 @@ for tbl, n in [("sources", 12), ("states", 2), ("districts", 36), ("sectors", 13
     assert c.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0] == n, (tbl, n)
 
 # honestly-empty tables stay empty (source carries none)
-for tbl in ["job_postings", "curriculum"]:
+for tbl in ["curriculum"]:
     assert c.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0] == 0, tbl
 
 # employer_evidence (new table from research package)
 assert c.execute("SELECT COUNT(*) FROM employer_evidence").fetchone()[0] == 5
+
+# job_postings (Role Radar: 2,471 real LinkedIn postings)
+assert c.execute("SELECT COUNT(*) FROM job_postings").fetchone()[0] == 2471
+assert c.execute("SELECT COUNT(*) FROM job_postings WHERE is_synthetic!=0").fetchone()[0] == 0
+assert c.execute("SELECT COUNT(*) FROM job_posting_skills").fetchone()[0] > 0
+assert c.execute("SELECT COUNT(*) FROM job_posting_occupations").fetchone()[0] > 0
 
 # users preserved
 assert c.execute("SELECT COUNT(*) FROM users").fetchone()[0] >= 2

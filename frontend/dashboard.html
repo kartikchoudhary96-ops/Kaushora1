@@ -21,11 +21,13 @@
 
       function kpi(label, value, sub, tag, tagCls) {
         const help={
-          "Skills tracked":"20 real skills from NSDC (SKL001-020), sector derived from linked occupations. <code>data_source=REAL</code>.",
-          "Training courses":"15 Government ITI courses (Saoner Nagpur + Mumbai) with NSQF levels. <code>data_source=REAL</code>.",
-          "Occupations":"32 NSDC occupations with QP codes, 10 explicit skill links across 4 occupations.",
+          "Skills tracked":"27 real skills from NSDC (SKL001-027), sector derived from linked occupations. <code>data_source=REAL</code>.",
+          "Training courses":"29 Government ITI courses (Saoner Nagpur + Mumbai + DVET + SIDH) with NSQF levels. <code>data_source=REAL</code>.",
+          "Occupations":"33 NSDC occupations with QP codes, explicit skill links across 4 occupations.",
           "Districts covered":"36 Maharashtra districts registry; 8 recorded training centres (Ahilyanagar 7, Nagpur 1).",
-          "Avg. alignment":"Coverage vs best same-sector explicit occupation; cross-sector never scored. 5 reference 100% shown alongside."
+          "Avg. alignment":"Coverage vs best same-sector explicit occupation; cross-sector never scored. 5 reference 100% shown alongside.",
+          "Job postings":"2,471 real LinkedIn job postings from Role Radar (HuggingFace, Apache 2.0). Scraped 2026-04/05. <code>is_synthetic=0</code>.",
+          "High-demand skills":"7 skills with observed demand signals from WEF/NASSCOM (85%+ score).",
         }[label]||"";
         return '<div class="card kpi"><div class="k-label">' + label + ' <span title="'+esc(help)+'" style="cursor:help;color:var(--muted)">ⓘ</span></div><div class="k-value">' + value +
           '</div><div class="k-sub">' + sub + '</div>' + (tag ? '<span class="k-tag ' + tagCls + '">' + tag + "</span>" : "") + (help?'<details style="margin-top:6px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">Why am I seeing this?</summary><p style="font-size:12px;color:var(--muted);margin:4px 0 0">'+esc(help)+'</p></details>':"") + "</div>";
@@ -40,12 +42,14 @@
           window.KShell.skeletonCards(5) + '<div class="card" style="margin-top:16px"><div class="skel" style="height:220px"></div></div>';
         try{ await renderContextBar(); }catch(e){}
         try {
-          const [ov, courses, croles, trends, ds, ev, ind, recs] = await Promise.all([
+          const [ov, courses, croles, trends, ds, ev, ind, recs, jobs] = await Promise.all([
             window.KaushoraAPI.overview(), window.KaushoraAPI.courses(),
             window.KaushoraAPI.careerRoles(), window.KaushoraAPI.trends(), window.KaushoraAPI.dataStatus(),
-            window.KaushoraAPI.evidence(), window.KaushoraAPI.indicators(), window.KaushoraAPI.recommendations()
+            window.KaushoraAPI.evidence(), window.KaushoraAPI.indicators(), window.KaushoraAPI.recommendations(),
+            window.KaushoraAPI.get("/api/jobs").catch(function(){ return {data:{summary:{total:0}}}; })
           ]);
           render(ov, courses, croles, trends, ds, ev, ind, recs);
+          renderJobMarket(jobs && jobs.data ? jobs.data : null);
         } catch (e) {
           page.innerHTML = window.KShell.errorState(e.message, "reload");
           window.reload = () => load();
@@ -57,13 +61,15 @@
         const alignTxt = t.avg_alignment == null ? "—" : t.avg_alignment + "%";
         let h = '<div class="eyebrow">Overview · ' + esc(ds.last_ingestion ? ds.last_ingestion.started_at.slice(0, 10) : "live") + "</div>" +
           '<h1 class="title">Labour Market Intelligence</h1>' +
-          '<p class="subtitle">Maharashtra-focused skill intelligence from PLFS, NSDC, PMKVY, DVET and DGT sources — every figure traced to its record.</p>' +
+          '<p class="subtitle">Maharashtra-focused skill intelligence from PLFS, NSDC, PMKVY, DVET, DGT and Role Radar sources — every figure traced to its record.</p>' +
           '<div class="grid kpis">' +
-          kpi("Skills tracked", t.unique_skills, "Real catalog (SKL001–020)", "Source data", "tag-green") +
+          kpi("Skills tracked", t.unique_skills, "Real catalog (SKL001–027)", "Source data", "tag-green") +
           kpi("Training courses", t.courses, "Government ITI courses", "Source data", "tag-green") +
           kpi("Occupations", t.roles, "NSDC QPs with NSQF levels", "Source data", "tag-green") +
+          kpi("Job postings", t.jobs_analysed, "Real LinkedIn postings (Role Radar)", "Source data", "tag-green") +
           kpi("Districts covered", t.districts, "Maharashtra registry · " + t.centres + " centres recorded", "Source data", "tag-green") +
           kpi("Avg. alignment", alignTxt, "Assessable course coverage", t.avg_alignment == null ? "Cannot assess" : "Derived by Kaushora", t.avg_alignment == null ? "tag-grey" : "tag-amber") +
+          kpi("High-demand skills", t.high_demand_skills, "Observed demand (WEF/NASSCOM)", "Derived by Kaushora", "tag-amber") +
           "</div>";
 
         // Insight → Evidence → Action (reusable pattern, here with the weakest alignment)
@@ -79,7 +85,17 @@
           '<p style="font-size:13px;margin:0"><b>Action:</b> Review course coverage for the lowest-scoring courses or publish missing NOS links for unmapped occupations. <a href="courses.html">Open Courses →</a></p></div>';
 
         h += '<div class="evidence-strip" style="margin:16px 0 0">' + window.KIcon("db") +
-          "<div><b>Per-skill demand scores: unavailable.</b> The source skill_demand assessment is NULL for every signal, so no demand ranking is fabricated. National aggregates (LFPR, NCS vacancies) appear below as evidence — never converted into skill scores.</div></div>";
+          "<div><b>Job market intelligence now active.</b> " + (t.jobs_analysed || 0) + " real LinkedIn postings from Role Radar (HuggingFace, Apache 2.0) provide vacancy evidence. " +
+          "Skills extracted from job descriptions map to the Kaushora catalog. See <a href='jobs.html'>Job Market Intelligence →</a></div></div>";
+
+        h += '<h2 class="section">Job Market Intelligence</h2>' +
+          '<p class="section-sub">Real LinkedIn job postings — skills demanded, sectors hiring, geographic distribution.</p>' +
+          '<div class="grid cols-2" style="margin-top:12px">' +
+          '<div class="card"><div class="eyebrow">Role Radar · 2026-04/05</div><h3>Top Demanded Skills</h3><p class="hint">Extracted from job descriptions. Count = number of postings mentioning each skill.</p><div id="jobSkills"></div></div>' +
+          '<div class="card"><div class="eyebrow">Role Radar · Sector breakdown</div><h3>Postings by Sector</h3><p class="hint">Industry-to-sector mapping from real postings.</p><div id="jobSectors"></div></div></div>' +
+          '<div class="grid cols-2" style="margin-top:16px">' +
+          '<div class="card"><div class="eyebrow">Geographic distribution</div><h3>Postings by State</h3><p class="hint">Maharashtra leads with 604 postings. State extracted from LinkedIn location field.</p><div class="chart-box sm"><canvas id="chJobState"></canvas></div></div>' +
+          '<div class="card"><div class="eyebrow">Employment type</div><h3>Full-time vs Contract vs Internship</h3><p class="hint">Breakdown from real postings.</p><div class="chart-box sm"><canvas id="chJobEmp"></canvas></div></div></div>';
 
         h += '<h2 class="section">Recorded labour-market evidence</h2>' +
           '<p class="section-sub">Observed values with source references — not estimates.</p>' +
@@ -288,6 +304,43 @@
             '<p class="hint">' + esc(t.evidence || t.trend_description || "") + "</p>" +
             '<div style="font-size:12px;color:var(--muted)">' + esc(t.source || "") + " · " + esc(t.period || "") + "</div></div>";
         }).join("");
+      }
+
+      function renderJobMarket(jobs) {
+        if (!jobs || !jobs.summary || jobs.summary.total === 0) return;
+        // Top skills
+        const skEl = document.getElementById("jobSkills");
+        if (skEl && jobs.top_skills && jobs.top_skills.length) {
+          skEl.innerHTML = jobs.top_skills.map(function (s) {
+            return '<div style="padding:6px 0;border-bottom:1px solid var(--line-soft)"><b>' + esc(s.skill_name) + '</b> <span class="pill tag-blue">' + s.c + ' postings</span></div>';
+          }).join("");
+        }
+        // Sectors
+        const secEl = document.getElementById("jobSectors");
+        if (secEl && jobs.by_sector && jobs.by_sector.length) {
+          secEl.innerHTML = jobs.by_sector.slice(0, 8).map(function (s) {
+            return '<div style="padding:6px 0;border-bottom:1px solid var(--line-soft)"><b>' + esc(s.sector) + '</b> <span class="pill tag-grey">' + s.c + '</span></div>';
+          }).join("");
+        }
+        // State chart
+        if (jobs.by_state && jobs.by_state.length) {
+          drawChart("chJobState", {
+            type: "bar",
+            data: { labels: jobs.by_state.slice(0, 8).map(function (s) { return s.state; }),
+                    datasets: [{ label: "Postings", data: jobs.by_state.slice(0, 8).map(function (s) { return s.c; }), backgroundColor: PAL.slice(0, 8), borderRadius: 6 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                       scales: { y: { title: { display: true, text: "job postings" } } } }
+          });
+        }
+        // Employment type chart
+        if (jobs.by_employment && jobs.by_employment.length) {
+          drawChart("chJobEmp", {
+            type: "doughnut",
+            data: { labels: jobs.by_employment.map(function (e) { return e.employment_type || "Unknown"; }),
+                    datasets: [{ data: jobs.by_employment.map(function (e) { return e.c; }), backgroundColor: PAL, borderColor: "#fff", borderWidth: 3 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } }
+          });
+        }
       }
 
       async function renderContextBar(){

@@ -38,9 +38,9 @@ assert ds["success"] is True
 assert ds["data"]["dataset_loaded"] is True
 assert ds["data"]["record_counts"]["skills"] == 27
 assert ds["data"]["record_counts"]["districts"] == 36
-assert ds["data"]["record_counts"]["job_postings"] == DB.execute("SELECT COUNT(*) FROM job_postings").fetchone()[0] == 0
+assert ds["data"]["record_counts"]["job_postings"] == DB.execute("SELECT COUNT(*) FROM job_postings").fetchone()[0] == 2471
 assert DB.execute("SELECT COUNT(*) FROM job_postings WHERE is_synthetic!=0").fetchone()[0] == 0
-assert "job_postings" in ds["data"]["empty_entities"]
+assert "job_postings" not in ds["data"]["empty_entities"]
 assert ds["data"]["last_ingestion"]["status"] == "success"
 print("data/status OK:", ds["data"]["record_counts"])
 
@@ -48,7 +48,7 @@ ov = get("/api/dashboard/overview")
 ov = ov["data"] if isinstance(ov, dict) and "data" in ov else ov
 db_counts = {t: DB.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
              for t in ["skills", "courses", "job_roles", "trends"]}
-assert ov["totals"]["jobs_analysed"] == DB.execute("SELECT COUNT(*) FROM job_postings").fetchone()[0] == 0, ov["totals"]
+assert ov["totals"]["jobs_analysed"] == DB.execute("SELECT COUNT(*) FROM job_postings").fetchone()[0] == 2471, ov["totals"]
 assert ov["totals"]["unique_skills"] == db_counts["skills"] == 27
 assert ov["totals"]["courses"] == db_counts["courses"] == 29
 assert ov["totals"]["roles"] == db_counts["job_roles"] == 33
@@ -68,12 +68,13 @@ assert dd["success"] is True
 assert dd["data"]["status"] == "mixed"  # now has 7 real + 20 insufficient
 assert len(dd["data"]["skills"]) == 27
 demand_with_score = [s for s in dd["data"]["skills"] if s.get("demand_score") is not None]
+demand_low = [s for s in dd["data"]["skills"] if s.get("demand_status") == "Low"]
 assert len(demand_with_score) == 7, len(demand_with_score)
-print("dashboard/demand OK: %d skills with real scores, %d insufficient" % (len(demand_with_score), 27 - len(demand_with_score)))
+print("dashboard/demand OK: %d skills with real scores, %d low, %d insufficient" % (len(demand_with_score), len(demand_low), 27 - len(demand_with_score) - len(demand_low)))
 
 tr = get("/api/dashboard/trends")
 tr = tr["data"] if isinstance(tr, dict) and "data" in tr else tr
-assert tr["monthly_postings"] == [] and tr["growing_skills"] == []
+assert len(tr["monthly_postings"]) >= 1 and tr["growing_skills"] == []
 assert len(tr["trend_signals"]) == 9
 trend_ids = {t["trend_id"] for t in tr["trend_signals"]}
 assert "TREND-001" in trend_ids and "TR001" in trend_ids
