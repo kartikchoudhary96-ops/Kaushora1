@@ -20,6 +20,7 @@
     ["occupation.html", "Occupations", "pulse", "occupation"],
     ["ai.html", "Kaushora AI", "spark", "ai"],
     ["sources.html", "Sources & Methodology", "db", "sources"],
+    ["health.html", "System Health", "pulse", "health"],
     ["login.html", "Login", "user", "login"],
   ];
 
