@@ -56,7 +56,14 @@
         h += evCard("Related occupations", (d.evidence_roles || []).map((r) => "<b>" + esc(r.role_id) + "</b> — " + esc(r.job_title) + (r.importance ? " <span class='pill tag-blue'>" + esc(r.importance) + "</span>" : "")));
         h += evCard("Teaching courses", (d.evidence_courses || []).map((c) => '<a href="course-detail.html?id=' + encodeURIComponent(c.id) + '"><b>' + esc(c.id) + "</b> — " + esc(c.course_name) + "</a>"));
         h += "</div><div class='grid cols-2' style='margin-top:16px'>";
-        h += evCard("Citing job records (" + (d.evidence_jobs || []).length + ")", (d.evidence_jobs || []).map((j) => esc(j.job_title)), "No vacancy microdata in the source dataset.");
+        h += evCard("Citing job records (" + (d.evidence_jobs || []).length + ")", (d.evidence_jobs || []).map(function (j) {
+          var parts = ["<b>" + esc(j.job_title) + "</b>"];
+          if (j.employer_name) parts.push(esc(j.employer_name));
+          if (j.state || j.city) parts.push(esc((j.city || "") + (j.city && j.state ? ", " : "") + (j.state || "")));
+          if (j.sector) parts.push('<span class="pill tag-grey">' + esc(j.sector) + '</span>');
+          if (j.employment_type) parts.push(esc(j.employment_type));
+          return parts.join(" · ");
+        }), "No vacancy microdata in the source dataset.");
         h += evCard("Employer citations (" + (d.evidence_employers || []).length + ")", (d.evidence_employers || []).map((e) => esc(e.employer_name)), "No source employer requirements — the source table is empty; user submissions would appear here once validated.");
         h += "</div>";
 

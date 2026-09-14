@@ -117,16 +117,58 @@ def build_context(student_id=None, entity=None, entity_id=None):
             try:
                 if entity == "skill":
                     r = c2.execute("SELECT id, skill_name, skill_category FROM skills WHERE id=?", (entity_id,)).fetchone()
-                    if r: ctx["entity"] = {"type": "skill", "id": r["id"], "name": r["skill_name"], "category": r["skill_category"]}
+                    if r:
+                        ctx["entity"] = {"type": "skill", "id": r["id"], "name": r["skill_name"], "category": r["skill_category"]}
+                        # Add job postings citing this skill
+                        jp_rows = c2.execute(
+                            "SELECT job_title, state, city, sector, employment_type FROM job_postings "
+                            "WHERE skill_ids LIKE ? ORDER BY scraped_at DESC LIMIT 10",
+                            (f"%{entity_id}%",)
+                        ).fetchall()
+                        ctx["entity"]["job_postings"] = [{"title": j["job_title"], "state": j["state"],
+                                                          "city": j["city"], "sector": j["sector"],
+                                                          "type": j["employment_type"]} for j in jp_rows]
+                        ctx["entity"]["posting_count"] = c2.execute(
+                            "SELECT COUNT(*) c FROM job_postings WHERE skill_ids LIKE ?",
+                            (f"%{entity_id}%",)
+                        ).fetchone()["c"]
                 elif entity == "occupation":
                     r = c2.execute("SELECT role_id, job_title, qp_code FROM job_roles WHERE role_id=?", (entity_id,)).fetchone()
-                    if r: ctx["entity"] = {"type": "occupation", "id": r["role_id"], "name": r["job_title"], "qp": r["qp_code"]}
+                    if r:
+                        ctx["entity"] = {"type": "occupation", "id": r["role_id"], "name": r["job_title"], "qp": r["qp_code"]}
+                        # Add job postings for this occupation's skills
+                        skill_ids = c2.execute(
+                            "SELECT skill_id FROM occupation_skills WHERE occupation_id=?",
+                            (entity_id,)
+                        ).fetchall()
+                        if skill_ids:
+                            like_clause = " OR ".join(["skill_ids LIKE ?"] * len(skill_ids))
+                            params = [f"%{s['skill_id']}%" for s in skill_ids]
+                            jp_rows = c2.execute(
+                                f"SELECT job_title, state, city, sector FROM job_postings "
+                                f"WHERE {like_clause} ORDER BY scraped_at DESC LIMIT 10",
+                                params
+                            ).fetchall()
+                            ctx["entity"]["job_postings"] = [{"title": j["job_title"], "state": j["state"],
+                                                              "city": j["city"], "sector": j["sector"]} for j in jp_rows]
+                            ctx["entity"]["posting_count"] = c2.execute(
+                                f"SELECT COUNT(DISTINCT id) c FROM job_postings WHERE {like_clause}",
+                                params
+                            ).fetchone()["c"]
                 elif entity == "course":
                     r = c2.execute("SELECT id, course_name, sector FROM courses WHERE id=?", (entity_id,)).fetchone()
                     if r: ctx["entity"] = {"type": "course", "id": r["id"], "name": r["course_name"], "sector": r["sector"]}
                 elif entity == "district":
                     r = c2.execute("SELECT district_id, district_name, district_code FROM districts WHERE district_id=?", (entity_id,)).fetchone()
-                    if r: ctx["entity"] = {"type": "district", "id": r["district_id"], "name": r["district_name"]}
+                    if r:
+                        ctx["entity"] = {"type": "district", "id": r["district_id"], "name": r["district_name"]}
+                        jp_rows = c2.execute(
+                            "SELECT job_title, state, city, sector FROM job_postings "
+                            "WHERE state LIKE ? OR city LIKE ? ORDER BY scraped_at DESC LIMIT 10",
+                            (f"%{r['district_name']}%", f"%{r['district_name']}%")
+                        ).fetchall()
+                        ctx["entity"]["job_postings"] = [{"title": j["job_title"], "state": j["state"],
+                                                          "city": j["city"], "sector": j["sector"]} for j in jp_rows]
             finally:
                 c2.close()
         except Exception:

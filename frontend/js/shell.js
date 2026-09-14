@@ -7,6 +7,7 @@
     ["dashboard.html", "Dashboard", "grid", "dashboard"],
     ["skills.html", "Skills", "pulse", "skills"],
     ["courses.html", "Courses", "book", "courses"],
+    ["jobs.html", "Job Market", "briefcase", "jobs"],
     ["districts.html", "Districts", "pin", "districts"],
     ["careers.html", "Careers", "case", "careers"],
     ["employers.html", "Employers", "bank", "employers"],

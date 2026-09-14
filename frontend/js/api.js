@@ -64,6 +64,7 @@
     analyzeCareer: (payload) => post("/api/careers/analyze", payload),
     employerSurvey: (payload) => post("/api/employers/survey", payload),
     employerRequirements: () => get("/api/employers/requirements"),
+    jobs: (params) => get("/api/jobs" + (params || "")),
     aiChat: (question) => post("/api/ai/chat", { question }),
     login: (email, password) => post("/api/auth/login", { email, password }),
     logout: () => post("/api/auth/logout", {}),

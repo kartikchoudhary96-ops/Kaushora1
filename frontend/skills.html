@@ -42,9 +42,9 @@
       function renderShell() {
         const statuses = [...new Set(all.map((s) => s.demand_status))];
         page.innerHTML =
-          '<div class="eyebrow">Skill registry · ' + all.length + ' real skills (SKL001–020)</div>' +
+          '<div class="eyebrow">Skill registry · ' + all.length + ' real skills (SKL001–027)</div>' +
           '<h1 class="title">Skill Intelligence</h1>' +
-          '<p class="subtitle">NSDC skill records with explicit NOS occupation links and ITI course coverage. Per-skill demand is unavailable in the source — shown honestly, never estimated.</p>' +
+          '<p class="subtitle">NSDC skill records with explicit NOS occupation links, ITI course coverage, and real job posting counts from Role Radar. Per-skill demand scores from WEF/NASSCOM where available.</p>' +
           '<div class="card"><div class="grid cols-3" style="align-items:end">' +
           '<div class="field" style="margin:0"><label for="q">Search skills</label><div class="searchbar">' + window.KIcon("search") +
           '<input id="q" type="search" placeholder="e.g. Communication, Data Entry, Plumbing…" aria-label="Search skills" /></div></div>' +
@@ -74,10 +74,13 @@
           document.getElementById("tbl").innerHTML = window.KShell.emptyState("No records available for this filter", "Try clearing the search or choosing a different sector.");
           return;
         }
-        let h = '<div class="table-wrap"><table class="data"><thead><tr><th>Skill</th><th>Sector</th><th>Related roles</th><th>Taught by</th><th>Demand status</th><th></th></tr></thead><tbody>';
+        let h = '<div class="table-wrap"><table class="data"><thead><tr><th>Skill</th><th>Sector</th><th>Postings</th><th>Related roles</th><th>Taught by</th><th>Demand status</th><th></th></tr></thead><tbody>';
         rows.forEach(function (s) {
+          var postingCount = s.demand_count || 0;
+          var postingPill = postingCount > 0 ? '<span class="pill tag-blue">' + postingCount + '</span>' : '<span class="pill tag-grey">0</span>';
           h += "<tr><td><b>" + esc(s.skill_name) + "</b><br><span style='color:var(--muted);font-size:12px'>" + esc(s.category || "") + " · " + esc(s.normalized_skill_name || "") + "</span></td>" +
             "<td>" + esc(s.sector || "—") + "</td>" +
+            "<td>" + postingPill + "</td>" +
             "<td><b>" + (s.related_roles || []).length + "</b> role(s)</td>" +
             "<td>" + ((s.taught_by_courses || []).length ? esc(s.taught_by_courses.join(", ")) : "—") + "</td>" +
             "<td>" + statusPill(s.demand_status) + "</td>" +

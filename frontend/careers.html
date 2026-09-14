@@ -86,6 +86,17 @@
           h += '<h2 class="section">Trend context (sector-level)</h2><div class="grid cols-3">' +
             r.trend_context.map((t) => '<div class="card"><span class="pill tag-blue">' + esc(t.direction || "") + "</span><h3 style='margin-top:8px'>" + esc(t.technology) + "</h3><p class='hint'>" + esc(t.evidence || "") + "</p></div>").join("") + "</div>";
         }
+        if (r.vacancy_evidence && r.vacancy_evidence.total_postings > 0) {
+          var ve = r.vacancy_evidence;
+          h += '<h2 class="section">Job Market Context</h2>' +
+            '<div class="card" style="border-left:4px solid var(--pistachio)">' +
+            '<p style="font-size:13px;margin:0"><b>' + ve.total_postings + ' real LinkedIn postings</b> from ' + esc(ve.source || "Role Radar") + ' provide vacancy evidence.</p>';
+          if (ve.top_skills && ve.top_skills.length) {
+            h += '<p style="font-size:13px;margin:8px 0 0">Top demanded skills across all postings: ' +
+              ve.top_skills.map(function (s) { return '<span class="pill tag-blue">' + esc(s.skill_name) + ' (' + s.c + ')</span>'; }).join(" ") + '</p>';
+          }
+          h += '<p style="font-size:12px;color:var(--muted);margin:8px 0 0"><a href="jobs.html">View all job postings →</a></p></div>';
+        }
         h += '<div class="evidence-strip">' + window.KIcon("shield") + "<div>" + esc(r.evidence_note || "") + "</div></div>";
         document.getElementById("out").innerHTML = h;
       }

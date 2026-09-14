@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job Market Intelligence — Kaushora</title>
+  <link rel="stylesheet" href="css/design.css" />
+</head>
+<body data-page="jobs">
+  <div id="shell"></div>
+  <script src="js/icons.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/shell.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const page = document.getElementById("page");
+      let summary = null, postings = [], states = [], sectors = [], empTypes = [];
+
+      async function load() {
+        page.innerHTML =
+          '<div class="eyebrow">Job Market Intelligence · Updated live</div>' +
+          '<h1 class="title">Job Market Intelligence</h1>' +
+          '<p class="subtitle">Real LinkedIn job postings from Role Radar (HuggingFace, Apache 2.0) — skills demanded, sectors hiring, geographic distribution.</p>' +
+          '<div class="grid kpis"><div class="card kpi"><div class="skel" style="height:80px"></div></div>'.repeat(4) + '</div>' +
+          '<div class="card" style="margin-top:16px"><div class="skel" style="height:300px"></div></div>';
+        try {
+          const data = await window.KaushoraAPI.jobs();
+          summary = data.summary;
+          postings = data.postings || [];
+          states = data.by_state || [];
+          sectors = data.by_sector || [];
+          empTypes = data.by_employment || [];
+          render();
+        } catch (e) {
+          page.innerHTML = window.KShell.errorState(e.message, "reload");
+          window.reload = () => load();
+        }
+      }
+
+      function render() {
+        const s = summary;
+        let h = '<div class="eyebrow">Job Market Intelligence · ' + esc(s.source) + ' · ' + esc(s.period) + '</div>' +
+          '<h1 class="title">Job Market Intelligence</h1>' +
+          '<p class="subtitle">Real LinkedIn job postings — skills demanded, sectors hiring, geographic distribution. All <code>is_synthetic=0</code>.</p>' +
+          '<div class="grid kpis">' +
+          kpi("Total postings", s.total, "Real LinkedIn postings", "Source data", "tag-green") +
+          kpi("Maharashtra", s.maharashtra || 0, Math.round((s.maharashtra || 0) / s.total * 100) + "% of total", "Source data", "tag-green") +
+          kpi("States covered", states.length, "Indian states + international", "Source data", "tag-green") +
+          kpi("Sectors", sectors.length, "Industry sectors represented", "Source data", "tag-green") +
+          '</div>';
+
+        // Filters
+        h += '<div class="card" style="margin-top:16px"><div class="grid cols-3" style="align-items:end">' +
+          '<div class="field" style="margin:0"><label for="fState">State</label><select id="fState" class="inline-filter" style="width:100%;padding:10px 13px">' +
+          '<option value="">All states</option>' + states.map(function (st) { return '<option value="' + esc(st.state) + '">' + esc(st.state) + ' (' + st.c + ')</option>'; }).join("") + '</select></div>' +
+          '<div class="field" style="margin:0"><label for="fSector">Sector</label><select id="fSector" class="inline-filter" style="width:100%;padding:10px 13px">' +
+          '<option value="">All sectors</option>' + sectors.map(function (s) { return '<option value="' + esc(s.sector) + '">' + esc(s.sector) + ' (' + s.c + ')</option>'; }).join("") + '</select></div>' +
+          '<div class="field" style="margin:0"><label for="fLimit">Show</label><select id="fLimit" class="inline-filter" style="width:100%;padding:10px 13px">' +
+          '<option value="50">50</option><option value="100">100</option><option value="200">200</option></select></div>' +
+          '</div></div>';
+
+        // Postings table
+        h += '<h2 class="section">Job Postings</h2>' +
+          '<p class="section-sub" id="countLine"></p><div id="tbl"></div>';
+
+        // Charts row
+        h += '<div class="grid cols-2" style="margin-top:16px">' +
+          '<div class="card"><div class="eyebrow">Geographic distribution</div><h3>Postings by State</h3><div class="chart-box sm"><canvas id="chState"></canvas></div></div>' +
+          '<div class="card"><div class="eyebrow">Sector breakdown</div><h3>Postings by Sector</h3><div class="chart-box sm"><canvas id="chSector"></canvas></div></div></div>' +
+          '<div class="grid cols-2" style="margin-top:16px">' +
+          '<div class="card"><div class="eyebrow">Employment type</div><h3>Full-time vs Contract vs Internship</h3><div class="chart-box sm"><canvas id="chEmp"></canvas></div></div>' +
+          '<div class="card"><div class="eyebrow">Data source</div><h3>About This Data</h3>' +
+          '<p style="font-size:13px;margin:0"><b>Source:</b> Role Radar (HuggingFace, Apache 2.0)</p>' +
+          '<p style="font-size:13px;margin:6px 0"><b>Period:</b> ' + esc(s.period) + '</p>' +
+          '<p style="font-size:13px;margin:6px 0"><b>Total:</b> ' + s.total + ' real LinkedIn postings</p>' +
+          '<p style="font-size:13px;margin:6px 0"><b>Skills:</b> Extracted from job descriptions via keyword matching, mapped to Kaushora catalog.</p>' +
+          '<p style="font-size:13px;margin:6px 0"><b>Locations:</b> Parsed from LinkedIn location field. State-level only.</p>' +
+          '<p style="font-size:13px;margin:6px 0;color:var(--muted)"><b>Limitations:</b> No salary data. No posting dates (scraped_at only). Some locations outside India (OH, KY).</p></div></div>';
+
+        h += '<div class="evidence-strip">' + window.KIcon("shield') +
+          "<div><b>Data integrity.</b> All " + s.total + " postings are <code>is_synthetic=0, data_source=REAL</code>. " +
+          "29 duplicate IDs were skipped during ingestion. Skill extraction is keyword-based — not NER or ML.</div></div>";
+
+        page.innerHTML = h;
+
+        document.getElementById("fState").addEventListener("change", applyFilters);
+        document.getElementById("fSector").addEventListener("change", applyFilters);
+        document.getElementById("fLimit").addEventListener("change", applyFilters);
+        applyFilters();
+        renderCharts();
+      }
+
+      function applyFilters() {
+        const stateF = document.getElementById("fState").value;
+        const sectorF = document.getElementById("fSector").value;
+        const limit = parseInt(document.getElementById("fLimit").value, 10);
+        let filtered = postings;
+        if (stateF) filtered = filtered.filter(function (p) { return (p.state || "") === stateF; });
+        if (sectorF) filtered = filtered.filter(function (p) { return (p.sector || "") === sectorF; });
+        const shown = filtered.slice(0, limit);
+        document.getElementById("countLine").textContent = "Showing " + shown.length + " of " + filtered.length + " postings" + (stateF || sectorF ? " (filtered from " + postings.length + " total)" : "");
+        if (!shown.length) {
+          document.getElementById("tbl").innerHTML = window.KShell.emptyState("No postings match this filter", "Try clearing the filters.");
+          return;
+        }
+        let tb = '<div class="table-wrap"><table class="data" style="min-width:800px"><thead><tr>' +
+          '<th>Job Title</th><th>Company</th><th>State</th><th>City</th><th>Sector</th><th>Type</th><th>Skills</th><th></th></tr></thead><tbody>';
+        shown.forEach(function (p) {
+          var skillHtml = (p.skill_ids || "").split(",").filter(Boolean).map(function (sk) {
+            return '<span class="pill tag-blue" style="margin:1px">' + esc(sk) + '</span>';
+          }).join(" ");
+          tb += "<tr><td><b>" + esc(p.job_title || "") + "</b></td>" +
+            "<td>" + esc(p.employer_name || p.source || "") + "</td>" +
+            "<td>" + esc(p.state || "") + "</td>" +
+            "<td>" + esc(p.city || "") + "</td>" +
+            "<td>" + esc(p.sector || "") + "</td>" +
+            "<td>" + esc(p.employment_type || "") + "</td>" +
+            "<td>" + (skillHtml || "—") + "</td>" +
+            '<td>' + (p.source_url ? '<a class="btn ghost sm" href="' + esc(p.source_url) + '" target="_blank" rel="noopener">View</a>' : '') + '</td></tr>';
+        });
+        document.getElementById("tbl").innerHTML = tb + "</tbody></table></div>";
+      }
+
+      function renderCharts() {
+        var PAL = ["#4c7a35","#b7d88a","#151515","#e8b44f","#5b8fc4","#cf5f52","#8a9a5b","#c9b896","#6f7468"];
+        // State chart
+        if (states.length) {
+          var el = document.getElementById("chState");
+          if (el && typeof Chart !== "undefined") {
+            new Chart(el, {
+              type: "bar",
+              data: { labels: states.slice(0, 10).map(function (s) { return s.state; }),
+                      datasets: [{ label: "Postings", data: states.slice(0, 10).map(function (s) { return s.c; }), backgroundColor: PAL.slice(0, 10), borderRadius: 6 }] },
+              options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                         scales: { y: { title: { display: true, text: "job postings" } } } }
+            });
+          }
+        }
+        // Sector chart
+        if (sectors.length) {
+          var el2 = document.getElementById("chSector");
+          if (el2 && typeof Chart !== "undefined") {
+            new Chart(el2, {
+              type: "doughnut",
+              data: { labels: sectors.slice(0, 8).map(function (s) { return s.sector; }),
+                      datasets: [{ data: sectors.slice(0, 8).map(function (s) { return s.c; }), backgroundColor: PAL, borderColor: "#fff", borderWidth: 3 }] },
+              options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } }
+            });
+          }
+        }
+        // Employment type chart
+        if (empTypes.length) {
+          var el3 = document.getElementById("chEmp");
+          if (el3 && typeof Chart !== "undefined") {
+            new Chart(el3, {
+              type: "doughnut",
+              data: { labels: empTypes.map(function (e) { return e.employment_type || "Unknown"; }),
+                      datasets: [{ data: empTypes.map(function (e) { return e.c; }), backgroundColor: PAL, borderColor: "#fff", borderWidth: 3 }] },
+              options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right" } } }
+            });
+          }
+        }
+      }
+
+      function kpi(label, value, sub, tag, tagCls) {
+        return '<div class="card kpi"><div class="k-label">' + label + '</div><div class="k-value">' + value +
+          '</div><div class="k-sub">' + sub + '</div><span class="k-tag ' + tagCls + '">' + tag + '</span></div>';
+      }
+      function esc(s) { return window.KShell.escapeHtml(s); }
+      load();
+    })();
+  </script>
+</body>
+</html>
