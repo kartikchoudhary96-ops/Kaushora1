@@ -39,6 +39,10 @@
       h+='<div class="grid cols-3"><div class="card kpi"><div class="k-label">Match score</div><div class="k-value">'+m.score+'%</div><div class="k-sub">'+esc(m.label)+'</div></div>'+
         '<div class="card kpi"><div class="k-label">Skills matched</div><div class="k-value">'+m.matched_skills.length+'/'+m.required_count+'</div><div class="k-sub">'+m.coverage+'% coverage</div></div>'+
         '<div class="card kpi"><div class="k-label">Missing</div><div class="k-value">'+m.missing_skills.length+'</div><div class="k-sub">'+m.weak_skills.length+' weak (proficiency)</div></div></div>';
+      var pc = (occ && occ.posting_count) || 0;
+      if(pc > 0){
+        h+='<div class="card" style="margin-top:12px;border-left:4px solid var(--pistachio)"><div style="display:flex;align-items:center;gap:8px"><span class="pill tag-blue">'+pc+' postings</span><span style="font-size:13px">Real LinkedIn job postings match this occupation</span></div><p style="font-size:12px;color:var(--muted);margin:6px 0 0"><a href="jobs.html">View all job market data →</a></p></div>';
+      }
       h+='<div class="card" style="margin-top:16px"><h3>Why Kaushora matched you</h3><p style="font-size:13px">Interest aligned: <b>'+(m.interest_aligned?"Yes":"No")+'</b> · Education ok: <b>'+(m.education_ok?"Yes":"No")+'</b> · Skills: '+m.matched_skills.join(", ")+'</p><p style="font-size:13px;color:var(--muted)">Method: '+esc(analysis.methodology.match_score)+'</p></div>';
       h+='<div class="grid cols-2" style="margin-top:16px"><div class="card"><h3>Your current skills</h3><p>'+ (analysis.profile.skills.map(s=>'<span class="pill tag-green">'+esc(s.skill_id)+' ('+esc(s.proficiency_label)+')</span>').join(" ")||'<span style="color:var(--muted)">None</span>') +'</p></div>'+
         '<div class="card"><h3>Skills you need</h3><p>'+m.missing_skills.map(sid=>'<span class="pill tag-grey">'+esc(sid)+'</span>').join(" ")+'</p><p style="font-size:12px;color:var(--muted)">Weak (have but low proficiency): '+ (m.weak_skills.join(", ")||"none") +'</p></div></div>';

@@ -108,6 +108,7 @@
         ["courses.html", "book", "Curriculum alignment", "Coverage scoring with ADD / UPDATE / REVIEW guidance."],
         ["districts.html", "pin", "District intelligence", "Honest capacity-gap states until records arrive."],
         ["careers.html", "case", "Career guidance", "Deterministic skill-to-role matching with pathways."],
+        ["jobs.html", "briefcase", "Job market intelligence", "2,471 real LinkedIn postings — sectors, skills, locations."],
         ["ai.html", "spark", "Kaushora AI", "Grounded answers over backend analytics — never invented stats."]
       ];
       document.getElementById("capGrid").innerHTML = caps.map(function (c) {
@@ -120,7 +121,8 @@
           const c = ds.record_counts, t = ov.totals;
           document.getElementById("heroStats").innerHTML =
             stat(c.skills, "skills catalogued") + stat(c.courses, "ITI courses") +
-            stat(c.job_roles, "NSDC occupations") + stat(c.districts, "MH districts") +
+            stat(c.job_roles, "NSDC occupations") + stat(t.jobs_analysed || 0, "job postings") +
+            stat(c.districts, "MH districts") +
             stat(t.avg_alignment == null ? "—" : t.avg_alignment + "%", "avg. alignment");
           document.getElementById("footSrc").textContent =
             "Source: Kaushora public dataset (PLFS/NSDC/MSDE/DGT/DVET) · ingested " + (ds.last_ingestion ? ds.last_ingestion.started_at.slice(0, 10) : "unknown");
