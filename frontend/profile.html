@@ -38,7 +38,7 @@
     "use strict";
     const page=document.getElementById("page");
     let step=0, data={ status:"", state_id:"", district_id:"", location_text:"", education_level:"", course_program:"", specialization:"", year_semester:"", qualification:"", nsqf_level:"", skills:[], interests:[], preferences:[], goal:"" };
-    let states=[], districts=[], allSkills=[];
+    let states=[], districts=[], allSkills=[], skillDemand={};
     const STATUS_OPTS=[
       {id:"School Student", label:"School Student", desc:"Class 8-12"},
       {id:"College Student", label:"College Student", desc:"Undergraduate / Postgraduate"},
@@ -59,6 +59,10 @@
         states=await window.KaushoraAPI.get("/api/meta/states");
         districts=await window.KaushoraAPI.get("/api/meta/districts");
         allSkills=await window.KaushoraAPI.get("/api/meta/skills");
+        try{
+          const fullSkills=await window.KaushoraAPI.get("/api/skills");
+          fullSkills.forEach(function(s){ skillDemand[s.id]={ demand_status:s.demand_status, demand_count:s.demand_count||0 }; });
+        }catch(e){}
       }catch(e){ /* allow offline wizard but location/skills will be limited */ }
       if(editId){
         try{
@@ -133,7 +137,11 @@
           const box=document.getElementById("skillResults");
           if(!q||q.length<2){ box.innerHTML=""; return; }
           const hits=allSkills.filter(s=>s.skill_name.toLowerCase().includes(q)||s.id.toLowerCase().includes(q)).slice(0,8);
-          box.innerHTML=hits.map(s=>'<div data-sid="'+s.id+'" data-name="'+esc(s.skill_name)+'"><b>'+esc(s.skill_name)+'</b> <span style="color:var(--muted);font-size:12px">'+esc(s.id)+' · '+esc(s.skill_category||'')+'</span></div>').join("") || '<div style="color:var(--muted)">No matching skill</div>';
+          box.innerHTML=hits.map(s=>{
+            const d=skillDemand[s.id]||{};
+            const demandPill=d.demand_status==='High'?'<span class="pill tag-green" style="font-size:10px">High demand</span>':d.demand_status==='Low'?'<span class="pill tag-amber" style="font-size:10px">Low demand</span>':'';
+            return '<div data-sid="'+s.id+'" data-name="'+esc(s.skill_name)+'"><b>'+esc(s.skill_name)+'</b> <span style="color:var(--muted);font-size:12px">'+esc(s.id)+' · '+esc(s.skill_category||'')+'</span> '+demandPill+'</div>';
+          }).join("") || '<div style="color:var(--muted)">No matching skill</div>';
           box.querySelectorAll("div[data-sid]").forEach(d=>d.addEventListener("click",()=>{
             addSkill(d.dataset.sid, d.dataset.name);
             inp.value=""; box.innerHTML="";

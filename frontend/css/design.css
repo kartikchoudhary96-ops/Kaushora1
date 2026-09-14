@@ -111,6 +111,7 @@ h2.section { font-size: 20px; margin: 30px 0 4px; letter-spacing: -0.01em; }
 .kpis { grid-template-columns: repeat(5, 1fr); }
 .cols-2 { grid-template-columns: 1fr 1fr; }
 .cols-3 { grid-template-columns: repeat(3, 1fr); }
+.cols-4 { grid-template-columns: repeat(4, 1fr); }
 .cols-23 { grid-template-columns: 2fr 1fr; }
 .cols-32 { grid-template-columns: 3fr 2fr; }
 .kpi .k-label { font-size: 11px; letter-spacing: 0.1em; font-weight: 800; color: var(--muted); text-transform: uppercase; }
@@ -270,7 +271,7 @@ canvas { max-width: 100%; }
   body.nav-open .sidebar { transform: none; }
   body.nav-open .scrim { display: block; position: fixed; inset: 0; background: rgba(21, 21, 21, 0.35); z-index: 35; }
   .hamburger { display: inline-flex; }
-  .cols-2, .cols-3 { grid-template-columns: 1fr; }
+  .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; }
   .flow { grid-template-columns: 1fr 1fr; }
   .page { padding: 18px 14px; }
   .topbar { padding: 10px 14px; }

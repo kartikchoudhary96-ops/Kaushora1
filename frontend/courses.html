@@ -16,6 +16,7 @@
       "use strict";
       const page = document.getElementById("page");
       let all = [];
+      let sectorPostings = {};
 
       function band(c) {
         if (c.alignment_score == null) return "Cannot assess";
@@ -32,7 +33,13 @@
       async function load() {
         page.innerHTML = '<div class="eyebrow">Curriculum intelligence</div><h1 class="title">Courses</h1><div class="grid cols-3"><div class="card"><div class="skel" style="height:200px"></div></div><div class="card"><div class="skel" style="height:200px"></div></div><div class="card"><div class="skel" style="height:200px"></div></div></div>';
         try {
-          all = await window.KaushoraAPI.courses();
+          const [coursesData, jobsData] = await Promise.all([
+            window.KaushoraAPI.courses(),
+            window.KaushoraAPI.get("/api/jobs").catch(function(){ return {data:{by_sector:[]}}; })
+          ]);
+          all = coursesData;
+          sectorPostings = {};
+          (jobsData.data && jobsData.data.by_sector || []).forEach(function(s){ sectorPostings[s.sector || s.sector_name] = s.c; });
           renderShell(); apply();
         } catch (e) {
           page.innerHTML = window.KShell.errorState(e.message, "reload");
@@ -46,7 +53,7 @@
         page.innerHTML =
           '<div class="eyebrow">Curriculum intelligence · ' + all.length + ' real ITI courses</div>' +
           '<h1 class="title">Course &amp; Curriculum Intelligence</h1>' +
-          '<p class="subtitle">Government ITI courses scored against explicit NOS occupation requirements (same sector only). Market-demand weighting is withheld — no demand records exist — so scores are pure coverage.</p>' +
+          '<p class="subtitle">Government ITI courses scored against explicit NOS occupation requirements (same sector only). Coverage scores with real job posting counts per sector.</p>' +
           '<div class="card"><div class="grid cols-3" style="align-items:end">' +
           '<div class="field" style="margin:0"><label for="fSec">Sector</label><select id="fSec" class="inline-filter" style="width:100%;padding:10px 13px"><option value="">All sectors</option>' +
           sectors.map((s) => "<option>" + esc(s) + "</option>").join("") + "</select></div>" +
@@ -69,10 +76,12 @@
         if (!rows.length) { el.innerHTML = window.KShell.emptyState("No courses match", "Adjust the sector or band filter."); return; }
         el.innerHTML = rows.map(function (c) {
           const n = (c.skills_taught || "").split(",").map((x) => x.trim()).filter(Boolean).length;
+          const sp = sectorPostings[c.sector] || 0;
+          const spPill = sp > 0 ? '<span class="pill tag-blue" style="font-size:11px">' + sp + ' postings</span>' : '';
           return '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:start">' +
             '<div class="eyebrow">' + esc(c.sector || "") + " · " + esc(c.qualification_level || "") + "</div>" + bandPill(c) + "</div>" +
             "<h3 style='margin-top:6px'>" + esc(c.course_name) + "</h3>" +
-            '<p class="hint">' + esc(c.provider || "") + " · " + esc(c.duration || "") + " · " + n + " recorded skills" + (c.course_code ? " · <code>" + esc(c.course_code) + "</code>" : "") + "</p>" +
+            '<p class="hint">' + esc(c.provider || "") + " · " + esc(c.duration || "") + " · " + n + " recorded skills" + (c.course_code ? " · <code>" + esc(c.course_code) + "</code>" : "") + " " + spPill + "</p>" +
             '<div style="font-size:26px;font-weight:800">' + (c.alignment_score == null ? "—" : c.alignment_score + "%") + ' <span style="font-size:13px;font-weight:600;color:var(--muted)">coverage</span></div>' +
             '<p class="hint">Action: <b>' + esc(c.recommended_action || "—") + "</b></p>" +
             '<a class="btn ghost sm" href="course-detail.html?id=' + encodeURIComponent(c.id) + '">Analyze alignment</a></div>';

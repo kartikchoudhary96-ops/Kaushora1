@@ -41,7 +41,10 @@
       let h='<a href="occupation.html" class="btn ghost sm">← All occupations</a>';
       h+='<div class="eyebrow" style="margin-top:14px">'+esc(occ.sector||"")+' · NSQF '+esc(occ.nsqf_level||"")+' · <code>'+esc(occ.occupation_code||occ.occupation_id)+'</code></div>';
       h+='<h1 class="title">'+esc(occ.occupation_name)+'</h1><p class="subtitle">'+esc(occ.qp_name||"")+' · '+esc(occ.standard_status||"")+'</p>';
-      h+='<div class="grid cols-3"><div class="card kpi"><div class="k-label">Required skills</div><div class="k-value">'+(reqMap&&reqMap.required_skills?reqMap.required_skills.length:"—")+'</div><div class="k-sub">Explicit NOS links</div></div>'+
+      var pc = occ.posting_count || 0;
+      var pcPill = pc > 0 ? '<span class="pill tag-blue">'+pc+'</span>' : '<span class="pill tag-grey">0</span>';
+      h+='<div class="grid cols-4"><div class="card kpi"><div class="k-label">Required skills</div><div class="k-value">'+(reqMap&&reqMap.required_skills?reqMap.required_skills.length:"—")+'</div><div class="k-sub">Explicit NOS links</div></div>'+
+        '<div class="card kpi"><div class="k-label">Job postings</div><div class="k-value">'+pcPill+'</div><div class="k-sub">Real LinkedIn postings</div></div>'+
         '<div class="card kpi"><div class="k-label">Related qualifications</div><div class="k-value">1</div><div class="k-sub">'+esc(occ.qp_code||"")+'</div></div>'+
         '<div class="card kpi"><div class="k-label">Sector</div><div class="k-value" style="font-size:18px;padding:10px 0">'+esc(occ.sector||"—")+'</div><div class="k-sub">NSDC sector</div></div></div>';
       if(reqMap && reqMap.required_skills && reqMap.required_skills.length){

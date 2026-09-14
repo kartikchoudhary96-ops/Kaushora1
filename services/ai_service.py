@@ -104,7 +104,7 @@ def build_context(student_id=None, entity=None, entity_id=None):
             if an:
                 ctx["student"] = {
                     "profile": {k: an["profile"].get(k) for k in ("id", "status", "district_name", "state_name", "goal", "skills", "interests", "preferences", "education_level")},
-                    "top_matches": [{"occupation": m["occupation_name"], "score": m["score"], "label": m["label"], "coverage": m["coverage"]} for m in an.get("career_matches", [])[:3]],
+                    "top_matches": [{"occupation": m["occupation_name"], "occupation_id": m["occupation_id"], "score": m["score"], "label": m["label"], "coverage": m["coverage"]} for m in an.get("career_matches", [])[:3]],
                     "prioritized_gaps": an.get("prioritized_gaps", [])[:3],
                     "next_actions": an.get("next_actions", [])[:3],
                 }
@@ -191,6 +191,7 @@ def fallback_answer(question, ctx):
         gaps = student.get("prioritized_gaps", [])
         nxt = student.get("next_actions", [])
         matches = student.get("top_matches", [])
+        vacancy = ctx.get("vacancy", {})
         if "what should i learn" in q or "what skills am i missing" in q:
             if not gaps:
                 return ("You have no prioritized gaps for your top matches — your current skills cover the required explicit NOS links.", _ev(["student_analysis"]))
@@ -202,10 +203,18 @@ def fallback_answer(question, ctx):
                 m = matches[0]
                 return (f"Top match {m['occupation']} ({m['score']}% {m['label']}, {m['coverage']}% coverage) was chosen for your status {prof.get('status')} and interests {', '.join(prof.get('interests', [])[:2])}. See Career Matches for the full why.",
                         _ev(["student_analysis"]))
-        # general student summary
+        # general student summary — include posting counts
+        match_txt = 'none'
+        if matches:
+            m0 = matches[0]
+            match_txt = f"{m0['occupation']} ({m0['label']})"
+            # look up posting count from vacancy or top_skills
+            vac_total = vacancy.get("total", 0)
+            if vac_total:
+                match_txt += f". {vac_total} real LinkedIn postings exist in the dataset"
         return (f"Profile #{prof.get('id')} — {prof.get('status')} in {prof.get('district_name') or '—'}. "
-                f"Top match: {matches[0]['occupation'] if matches else 'none'} "
-                f"({matches[0]['label'] if matches else ''}). Gaps: {', '.join(g['skill_name'] for g in gaps[:2]) or 'none'}.",
+                f"Top match: {match_txt}. "
+                f"Gaps: {', '.join(g['skill_name'] for g in gaps[:2]) or 'none'}.",
                 _ev(["student_analysis"]))
     if "district" in q or "nagpur" in q or "training centre" in q or "capacity" in q:
         named = "; ".join(
