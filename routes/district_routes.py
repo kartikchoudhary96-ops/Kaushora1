@@ -7,9 +7,9 @@ bp = Blueprint("districts", __name__)
 
 @bp.get("/api/districts")
 def lst():
-    """All 36 Maharashtra districts (master registry) with real centre counts
-    and capacity facts where published. No estimated gaps — demand is
-    unpublished in the source."""
+    """All 36 Maharashtra districts (master registry) with real centre counts,
+    capacity facts where published, and job posting counts. No estimated gaps —
+    demand is unpublished in the source."""
     c = get_db()
     try:
         districts = [dict(r) for r in c.execute("SELECT * FROM districts ORDER BY district_name").fetchall()]
@@ -18,6 +18,12 @@ def lst():
         caps = {r["district_id"]: dict(r) for r in c.execute("SELECT * FROM district_capacity").fetchall()}
         recs = [dict(r) for r in c.execute(
             "SELECT district_id, COUNT(*) n FROM recommendations GROUP BY district_id").fetchall()]
+        # Job posting counts per district (matching on district_name in city field)
+        vac_counts = {}
+        for r in c.execute(
+            "SELECT city, COUNT(*) c FROM job_postings WHERE state='Maharashtra' GROUP BY city"
+        ).fetchall():
+            vac_counts[r["city"]] = r["c"]
     finally:
         c.close()
     n_centres = {r["district_id"]: r["n"] for r in centres}
@@ -26,6 +32,15 @@ def lst():
     for d in districts:
         did = d["district_id"]
         cap = caps.get(did)
+        # Try to match district name to job posting city
+        dname = d["district_name"]
+        posting_count = vac_counts.get(dname, 0)
+        # Also check common name variations
+        if posting_count == 0:
+            for city, cnt in vac_counts.items():
+                if dname.lower() in city.lower() or city.lower() in dname.lower():
+                    posting_count = cnt
+                    break
         out.append({
             "district_id": did,
             "district": d["district_name"],
@@ -35,6 +50,7 @@ def lst():
             "capacity": cap,
             "capacity_gap": None,  # demand unpublished -> honestly unavailable
             "recommendations": n_recs.get(did, 0),
+            "job_postings": posting_count,
             "data_source": "REAL",
         })
     return jsonify(out)

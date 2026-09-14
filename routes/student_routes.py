@@ -194,7 +194,26 @@ def meta_occs():
         if where:
             sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY job_title LIMIT 80"
-        return jsonify([dict(r) for r in c.execute(sql, args).fetchall()])
+        rows = [dict(r) for r in c.execute(sql, args).fetchall()]
+        # Attach per-occupation vacancy counts
+        vac = {}
+        for r in c.execute("""
+            SELECT jpo.occupation_id, COUNT(*) c FROM job_posting_occupations jpo
+            GROUP BY jpo.occupation_id
+        """).fetchall():
+            vac[r["occupation_id"]] = r["c"]
+        skill_vac = {}
+        for r in c.execute("""
+            SELECT os.occupation_id, COUNT(DISTINCT jps.job_id) c
+            FROM occupation_skills os
+            JOIN job_posting_skills jps ON os.skill_id = jps.skill_id
+            GROUP BY os.occupation_id
+        """).fetchall():
+            skill_vac[r["occupation_id"]] = r["c"]
+        for row in rows:
+            oid = row["occupation_id"]
+            row["posting_count"] = vac.get(oid, 0) or skill_vac.get(oid, 0)
+        return jsonify(rows)
     finally:
         c.close()
 

@@ -57,7 +57,18 @@
             '<p><b>' + esc(g.skill_name || g.skill_id) + ':</b> <span class="pill tag-grey">' + esc(g.gap_status || "—") + "</span><br><span class='hint'>" + esc(g.calculation_method || "") + "</span></p>").join("")
             : '<p class="hint">No gap assessment published for this district.</p>') + '</div></div>' +
           '<div class="card" style="margin-top:16px"><div class="eyebrow">Labour context (state-level — not downscaled)</div><h3>Maharashtra / national indicators</h3>' +
-          table((d.state_indicators || []).slice(0, 8), ["indicator_name", "indicator_value", "unit", "population_group"], ["Indicator", "Value", "Unit", "Group"]) + '</div>';
+          table((d.state_indicators || []).slice(0, 8), ["indicator_name", "indicator_value", "unit", "population_group"], ["Indicator", "Value", "Unit", "Group"]) + '</div>' +
+          ((d.job_postings || []).length ?
+            '<div class="card" style="margin-top:16px"><div class="eyebrow">Job Market Evidence</div><h3>' + s.job_postings + ' relevant job postings</h3>' +
+            '<p class="hint">Real LinkedIn postings from Role Radar matching this district/region.</p>' +
+            '<div class="table-wrap"><table class="data" style="min-width:0"><thead><tr><th>Job Title</th><th>Sector</th><th>Skills</th></tr></thead><tbody>' +
+            d.job_postings.map(function (j) {
+              var skills = (j.skill_ids || "").split(",").filter(Boolean).map(function (sk) {
+                return '<span class="pill tag-blue" style="margin:1px;font-size:11px">' + esc(sk) + '</span>';
+              }).join(" ");
+              return '<tr><td><b>' + esc(j.job_title || "") + '</b></td><td>' + esc(j.sector || "—") + '</td><td>' + (skills || "—") + '</td></tr>';
+            }).join("") +
+            '</tbody></table></div></div>' : '<div class="card" style="margin-top:16px"><div class="eyebrow">Job Market Evidence</div><h3>No job postings</h3><p class="hint">No matching postings found for this district in the current dataset.</p></div>');
       }
       function metric(label, value) { return '<div class="card kpi"><div class="k-label">' + esc(label) + '</div><div class="k-value">' + (value == null ? "—" : esc(value)) + '</div></div>'; }
       function table(rows, keys, labels) {

@@ -8,10 +8,27 @@ bp = Blueprint("career", __name__)
 
 @bp.get("/api/careers/roles")
 def roles():
-    """Roles with their mappable skill requirements (evidence for guidance)."""
+    """Roles with their mappable skill requirements and vacancy counts (evidence for guidance)."""
     c = get_db()
     try:
         roles = [dict(r) for r in c.execute("SELECT role_id, job_title, normalized_role, sector, qualification_level FROM job_roles").fetchall()]
+        # Per-role vacancy counts from job_posting_occupations junction table
+        vac_counts = {}
+        for r in c.execute("""
+            SELECT jpo.occupation_id, COUNT(*) c
+            FROM job_posting_occupations jpo
+            GROUP BY jpo.occupation_id
+        """).fetchall():
+            vac_counts[r["occupation_id"]] = r["c"]
+        # Also count via skill matching for roles without direct occupation links
+        skill_vac = {}
+        for r in c.execute("""
+            SELECT os.occupation_id, COUNT(DISTINCT jps.job_id) c
+            FROM occupation_skills os
+            JOIN job_posting_skills jps ON os.skill_id = jps.skill_id
+            GROUP BY os.occupation_id
+        """).fetchall():
+            skill_vac[r["occupation_id"]] = r["c"]
     finally:
         c.close()
     req, _ = role_skill_map()
@@ -19,7 +36,8 @@ def roles():
         [
             {"role_id": r["role_id"], "job_title": r["job_title"], "normalized_role": r.get("normalized_role"),
              "sector": r.get("sector"), "required_skills": sorted(req.get(r["role_id"], set())),
-             "scorable": len(req.get(r["role_id"], set())) > 0}
+             "scorable": len(req.get(r["role_id"], set())) > 0,
+             "posting_count": vac_counts.get(r["role_id"], 0) or skill_vac.get(r["role_id"], 0)}
             for r in roles
         ]
     )

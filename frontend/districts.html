@@ -37,20 +37,24 @@
           '<p class="hint">Nagpur (DT019) is the best-documented district: ITI Saoner, 120 CTS seats, 2 recommendations. Select any district for its evidence.</p></div></div>';
         h += '<div class="card" style="margin-top:16px"><div class="field" style="margin:0;max-width:420px"><label for="q">Find a district</label><div class="searchbar">' + window.KIcon("search") +
           '<input id="q" type="search" placeholder="e.g. Nagpur, Pune, Thane…" aria-label="Search districts" /></div></div>' +
-          '<div class="table-wrap" style="margin-top:12px"><table class="data"><thead><tr><th>District</th><th>Code</th><th>Recorded centres</th><th>Capacity facts</th><th>Recommendations</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>';
+          '<div class="table-wrap" style="margin-top:12px"><table class="data"><thead><tr><th>District</th><th>Code</th><th>Recorded centres</th><th>Capacity facts</th><th>Job Postings</th><th>Recommendations</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>';
         h += '<div class="evidence-strip">' + window.KIcon("shield") + "<div><b>Source data (REAL).</b> District registry, PMKVY centre lists and DVET capacity facts. "
           + "34 districts show honestly as having no recorded centres — absence of records, not absence of training.</div></div>";
         page.innerHTML = h;
         const paint = function () {
           const q = (document.getElementById("q").value || "").toLowerCase();
           const list = rows.filter((d) => !q || (d.district || "").toLowerCase().includes(q));
-          document.getElementById("rows").innerHTML = list.map((d) =>
-            "<tr><td><b>" + esc(d.district) + "</b></td><td>" + esc(d.district_code || "—") + "</td>" +
+          document.getElementById("rows").innerHTML = list.map((d) => {
+            var pc = d.job_postings || 0;
+            var pill = pc > 0 ? '<span class="pill tag-blue">' + pc + '</span>' : '<span class="pill tag-grey">0</span>';
+            return "<tr><td><b>" + esc(d.district) + "</b></td><td>" + esc(d.district_code || "—") + "</td>" +
             "<td><b>" + (d.training_centres || 0) + "</b></td>" +
             "<td>" + (d.capacity ? esc(d.capacity.scheme || "") + (d.capacity.training_seats != null ? " · " + d.capacity.training_seats + " seats" : d.capacity.training_centres != null ? " · " + d.capacity.training_centres + " centres" : "") : "—") + "</td>" +
+            "<td>" + pill + "</td>" +
             "<td>" + (d.recommendations || 0) + "</td>" +
-            '<td><a class="btn ghost sm" href="district-detail.html?id=' + encodeURIComponent(d.district_id) + '">Open</a></td></tr>').join("") ||
-            '<tr><td colspan="6">No districts match this search.</td></tr>';
+            '<td><a class="btn ghost sm" href="district-detail.html?id=' + encodeURIComponent(d.district_id) + '">Open</a></td></tr>';
+          }).join("") ||
+            '<tr><td colspan="7">No districts match this search.</td></tr>';
         };
         document.getElementById("q").addEventListener("input", paint);
         paint();

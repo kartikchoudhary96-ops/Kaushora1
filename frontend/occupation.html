@@ -41,8 +41,12 @@
       const rows=all.filter(o=> (!q||o.occupation_name.toLowerCase().includes(q)||o.occupation_code.toLowerCase().includes(q)) && (!sec||o.sector===sec) && (!lv||String(o.nsqf_level)===lv));
       const el=document.getElementById("tbl");
       if(!rows.length){ el.innerHTML=window.KShell.emptyState("No occupations match","Try clearing filters."); return; }
-      el.innerHTML='<div class="table-wrap"><table class="data"><thead><tr><th>Occupation</th><th>Sector</th><th>NSQF</th><th>QP Code</th><th></th></tr></thead><tbody>'+
-        rows.map(o=>'<tr><td><b>'+esc(o.occupation_name)+'</b><br><span style="color:var(--muted);font-size:12px">'+esc(o.occupation_code||o.occupation_id)+'</span></td><td>'+esc(o.sector||"—")+'</td><td>'+esc(o.nsqf_level||"—")+'</td><td><code>'+esc(o.qp_code||"")+'</code></td><td><a class="btn ghost sm" href="occupation-detail.html?id='+encodeURIComponent(o.occupation_id)+'">View</a></td></tr>').join("")+'</tbody></table></div>';
+      el.innerHTML='<div class="table-wrap"><table class="data"><thead><tr><th>Occupation</th><th>Sector</th><th>NSQF</th><th>QP Code</th><th>Postings</th><th></th></tr></thead><tbody>'+
+        rows.map(o=>{
+          var pc = o.posting_count || 0;
+          var pill = pc > 0 ? '<span class="pill tag-blue">'+pc+'</span>' : '<span class="pill tag-grey">0</span>';
+          return '<tr><td><b>'+esc(o.occupation_name)+'</b><br><span style="color:var(--muted);font-size:12px">'+esc(o.occupation_code||o.occupation_id)+'</span></td><td>'+esc(o.sector||"—")+'</td><td>'+esc(o.nsqf_level||"—")+'</td><td><code>'+esc(o.qp_code||"")+'</code></td><td>'+pill+'</td><td><a class="btn ghost sm" href="occupation-detail.html?id='+encodeURIComponent(o.occupation_id)+'">View</a></td></tr>';
+        }).join("")+'</tbody></table></div>';
     }
     function esc(s){ return window.KShell.escapeHtml(s); }
     load();
