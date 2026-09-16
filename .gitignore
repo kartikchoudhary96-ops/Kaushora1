@@ -8,6 +8,7 @@ __pycache__/
 logs/
 node_modules/
 database/*.db
+database/backups/
 *.db-journal
 .vscode/
 .idea/
