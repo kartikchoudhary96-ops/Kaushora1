@@ -1,0 +1,64 @@
+{
+  "_generated_by": "Kaushora scripts/stage_occupation_mapping.py (NOT part of the DeepSeek research package)",
+  "staged_at": "2026-09-16T12:00:02.840197+00:00",
+  "package": "Problem #2 occupation->QP->NOS->skill research (DeepSeek, 2026-09-16 batch)",
+  "files": [
+    {
+      "canonical_name": "source_registry.csv",
+      "original_filename": "deepseek_csv_20260916_16efa4.txt",
+      "original_path": "C:\\Users\\ASUS\\Downloads\\deepseek_csv_20260916_16efa4.txt",
+      "sha256": "3c7a377b9bf4738c4aa962de4c87b3ccd1d7f43f6427a09cb9a26ee2db2b74cc",
+      "bytes": 7801,
+      "lines_including_header": 34,
+      "data_rows": 33,
+      "header": "source_id,organization,source_title,source_type,url,publication_year,accessed_date,geographic_scope,source_status,official_or_secondary,relevance,notes"
+    },
+    {
+      "canonical_name": "occupation_nos.csv",
+      "original_filename": "deepseek_csv_20260916_2d5c19.txt",
+      "original_path": "C:\\Users\\ASUS\\Downloads\\deepseek_csv_20260916_2d5c19.txt",
+      "sha256": "6224197ca901632e77a010731d62cc3d76b55bd1141e8a90c65698e64e10a9a7",
+      "bytes": 16483,
+      "lines_including_header": 66,
+      "data_rows": 65,
+      "header": "occupation_id,occupation_name,qp_code,qp_title,sector_skill_council,nsqf_level,qp_status,nos_code,nos_title,nos_status,source_id,source_url,publication_year,observed_or_derived,confidence,notes"
+    },
+    {
+      "canonical_name": "nos_competencies.csv",
+      "original_filename": "deepseek_csv_20260916_683a0d.txt",
+      "original_path": "C:\\Users\\ASUS\\Downloads\\deepseek_csv_20260916_683a0d.txt",
+      "sha256": "8f4e4d9ec7c143aa5b5c2b51afc094d56e12fc055d4789829b6ffcd9efc924c6",
+      "bytes": 18066,
+      "lines_including_header": 64,
+      "data_rows": 63,
+      "header": "competency_id,qp_code,nos_code,nos_title,competency_text,knowledge_text,performance_text,source_id,source_url,evidence_type,observed_or_derived,confidence,notes"
+    },
+    {
+      "canonical_name": "occupation_skills.csv",
+      "original_filename": "deepseek_csv_20260916_95ee78.txt",
+      "original_path": "C:\\Users\\ASUS\\Downloads\\deepseek_csv_20260916_95ee78.txt",
+      "sha256": "8eb92519ec46b97771101cea51c85c929a73d315d8af14f233ff03da68028dcc",
+      "bytes": 9327,
+      "lines_including_header": 31,
+      "data_rows": 30,
+      "header": "occupation_id,occupation_name,qp_code,nos_code,skill_id,skill_name,original_competency,mapping_method,mapping_source,source_id,source_url,confidence,observed_or_derived,mapping_explanation,notes"
+    },
+    {
+      "canonical_name": "skill_aliases.csv",
+      "original_filename": "deepseek_csv_20260916_5b40f2.txt",
+      "original_path": "C:\\Users\\ASUS\\Downloads\\deepseek_csv_20260916_5b40f2.txt",
+      "sha256": "164c347e4bf4875ca7949a6ff66dd1c412a189de4748d4fbcdeef555cdc5babe",
+      "bytes": 1078,
+      "lines_including_header": 8,
+      "data_rows": 7,
+      "header": "alias,canonical_skill_name,canonical_skill_id,source_context,mapping_basis,source_id,confidence,notes"
+    }
+  ],
+  "missing_research_docs": [
+    "README.md",
+    "data_dictionary.md",
+    "methodology.md",
+    "validation_report.md"
+  ],
+  "note": "Content bytes are exact copies. Canonical .csv names are renames only, no transformation."
+}

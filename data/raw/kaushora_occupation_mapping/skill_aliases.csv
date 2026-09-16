@@ -1,0 +1,8 @@
+alias,canonical_skill_name,canonical_skill_id,source_context,mapping_basis,source_id,confidence,notes
+MIG Welding,Welding,SK_WELDING,NOS CON/N1253 - MIG welding operations,Terminology variant of core welding competency,SRC_005,HIGH,MIG is a type of welding
+TIG Welding,Welding,SK_WELDING,NOS CON/N1255 - TIG welding operations,Terminology variant of core welding competency,SRC_005,HIGH,TIG is a type of welding
+SMAW Welding,Welding,SK_WELDING,NOS CON/N1257 - SMAW welding operations,Terminology variant of core welding competency,SRC_005,HIGH,SMAW is a type of welding
+Fault Diagnosis,Diagnostic Skills,SK_DIAGNOSTIC,NOS ELE/N3111 - Diagnose fault in washing machine,Terminology variant,SRC_016,HIGH,
+Troubleshooting,Diagnostic Skills,SK_DIAGNOSTIC,Common industry terminology,Synonymous with fault diagnosis,SRC_016,MEDIUM,Based on industry usage
+Quality Checking,Quality Control,SK_QUALITY,NOS ASC/N3503 - Quality checks,Terminology variant,SRC_001,HIGH,
+Inspection,Quality Control,SK_QUALITY,NOS LSC/N2116 - Inspect goods,Terminology variant,SRC_014,MEDIUM,Context-dependent
