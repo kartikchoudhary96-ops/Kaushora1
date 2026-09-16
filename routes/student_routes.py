@@ -186,8 +186,8 @@ def meta_occs():
         where = []
         args = []
         if q:
-            where.append("(lower(job_title) LIKE ? OR lower(occupation_code) LIKE ?)")
-            args.extend([f"%{q}%", f"%{q}%"])
+            where.append("(lower(job_title) LIKE ? OR lower(occupation_code) LIKE ? OR lower(role_id) LIKE ? OR lower(qp_code) LIKE ?)")
+            args.extend([f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"])
         if sector:
             where.append("sector=?")
             args.append(sector)

@@ -8,6 +8,7 @@
 </head>
 <body data-page="jobs">
   <div id="shell"></div>
+  <script src="js/vendor/chart.umd.min.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/shell.js"></script>
@@ -25,12 +26,14 @@
           '<div class="grid kpis"><div class="card kpi"><div class="skel" style="height:80px"></div></div>'.repeat(4) + '</div>' +
           '<div class="card" style="margin-top:16px"><div class="skel" style="height:300px"></div></div>';
         try {
-          const data = await window.KaushoraAPI.jobs();
-          summary = data.summary;
+          const raw = await window.KaushoraAPI.jobs();
+          const data = (raw && raw.summary) ? raw : (raw && raw.data ? raw.data : raw);
+          summary = data.summary || { total: 0, source: "Role Radar (HuggingFace, Apache 2.0)", period: "2026-04 to 2026-05" };
           postings = data.postings || [];
           states = data.by_state || [];
           sectors = data.by_sector || [];
           empTypes = data.by_employment || [];
+          if (!summary || typeof summary.total === "undefined") throw new Error("Job market data unavailable — backend returned no summary.");
           render();
         } catch (e) {
           page.innerHTML = window.KShell.errorState(e.message, "reload");
@@ -39,13 +42,13 @@
       }
 
       function render() {
-        const s = summary;
-        let h = '<div class="eyebrow">Job Market Intelligence · ' + esc(s.source) + ' · ' + esc(s.period) + '</div>' +
+        const s = summary || {};
+        let h = '<div class="eyebrow">Job Market Intelligence · ' + esc(s.source || "Role Radar") + ' · ' + esc(s.period || "") + '</div>' +
           '<h1 class="title">Job Market Intelligence</h1>' +
           '<p class="subtitle">Real LinkedIn job postings — skills demanded, sectors hiring, geographic distribution. All <code>is_synthetic=0</code>.</p>' +
           '<div class="grid kpis">' +
-          kpi("Total postings", s.total, "Real LinkedIn postings", "Source data", "tag-green") +
-          kpi("Maharashtra", s.maharashtra || 0, Math.round((s.maharashtra || 0) / s.total * 100) + "% of total", "Source data", "tag-green") +
+          kpi("Total postings", s.total || 0, "Real LinkedIn postings", "Source data", "tag-green") +
+          kpi("Maharashtra", s.maharashtra || 0, (s.total ? Math.round((s.maharashtra || 0) / s.total * 100) : 0) + "% of total", "Source data", "tag-green") +
           kpi("States covered", states.length, "Indian states + international", "Source data", "tag-green") +
           kpi("Sectors", sectors.length, "Industry sectors represented", "Source data", "tag-green") +
           '</div>';
@@ -72,14 +75,14 @@
           '<div class="card"><div class="eyebrow">Employment type</div><h3>Full-time vs Contract vs Internship</h3><div class="chart-box sm"><canvas id="chEmp"></canvas></div></div>' +
           '<div class="card"><div class="eyebrow">Data source</div><h3>About This Data</h3>' +
           '<p style="font-size:13px;margin:0"><b>Source:</b> Role Radar (HuggingFace, Apache 2.0)</p>' +
-          '<p style="font-size:13px;margin:6px 0"><b>Period:</b> ' + esc(s.period) + '</p>' +
-          '<p style="font-size:13px;margin:6px 0"><b>Total:</b> ' + s.total + ' real LinkedIn postings</p>' +
+          '<p style="font-size:13px;margin:6px 0"><b>Period:</b> ' + esc(s.period || "") + '</p>' +
+          '<p style="font-size:13px;margin:6px 0"><b>Total:</b> ' + (s.total || 0) + ' real LinkedIn postings</p>' +
           '<p style="font-size:13px;margin:6px 0"><b>Skills:</b> Extracted from job descriptions via keyword matching, mapped to Kaushora catalog.</p>' +
           '<p style="font-size:13px;margin:6px 0"><b>Locations:</b> Parsed from LinkedIn location field. State-level only.</p>' +
           '<p style="font-size:13px;margin:6px 0;color:var(--muted)"><b>Limitations:</b> No salary data. No posting dates (scraped_at only). Some locations outside India (OH, KY).</p></div></div>';
 
         h += '<div class="evidence-strip">' + window.KIcon("shield") +
-          "<div><b>Data integrity.</b> All " + s.total + " postings are <code>is_synthetic=0, data_source=REAL</code>. " +
+          "<div><b>Data integrity.</b> All " + (s.total || 0) + " postings are <code>is_synthetic=0, data_source=REAL</code>. " +
           "29 duplicate IDs were skipped during ingestion. Skill extraction is keyword-based — not NER or ML.</div></div>";
 
         page.innerHTML = h;

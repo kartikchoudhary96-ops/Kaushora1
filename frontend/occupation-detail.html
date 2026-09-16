@@ -20,14 +20,23 @@
       if(!id){ page.innerHTML=window.KShell.emptyState("No occupation selected","Choose from the Occupations page."); return; }
       page.innerHTML='<a href="occupation.html" class="btn ghost sm">← All occupations</a><div class="card" style="margin-top:14px"><div class="skel" style="height:280px"></div></div>';
       try{
-        const [occList, skills, courses, quals] = await Promise.all([
-          window.KaushoraAPI.get("/api/meta/occupations?q="+encodeURIComponent(id)),
-          window.KaushoraAPI.get("/api/skills"),
-          window.KaushoraAPI.get("/api/courses"),
-          window.KaushoraAPI.get("/api/meta/skills") // dummy to keep parallel, not needed
-        ]);
-        const occ=occList.find(o=>o.occupation_id===id)||occList[0];
+        let occList = await window.KaushoraAPI.get("/api/meta/occupations?q="+encodeURIComponent(id));
+        // API may return envelope {data:[...]} or raw array — normalize
+        if (occList && occList.data && Array.isArray(occList.data)) occList = occList.data;
+        let occ = Array.isArray(occList) ? occList.find(o=>o.occupation_id===id) : null;
+        // fallback: if q-filter missed (e.g. cached or code mismatch), fetch full list
+        if (!occ) {
+          let all = await window.KaushoraAPI.get("/api/meta/occupations");
+          if (all && all.data && Array.isArray(all.data)) all = all.data;
+          occ = Array.isArray(all) ? all.find(o=>o.occupation_id===id) : null;
+          if (occ) occList = all;
+        }
         if(!occ) throw new Error("Occupation not found");
+        // keep skills/courses fetches parallel where possible, but occ is now resolved
+        const [skills, courses] = await Promise.all([
+          window.KaushoraAPI.get("/api/skills"),
+          window.KaushoraAPI.get("/api/courses")
+        ]);
         // fetch occupation_skills and related courses via dedicated endpoint? Use career/roles and course skills
         const [reqMap, courseMap, ev] = await Promise.all([
           window.KaushoraAPI.get("/api/careers/roles").then(r=>r.find(x=>x.role_id===id)),

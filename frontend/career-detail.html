@@ -21,11 +21,23 @@
       if(!pid||!occId){ page.innerHTML=window.KShell.emptyState("Missing context","Open a career from your student dashboard."); return; }
       page.innerHTML='<a href="student.html?id='+pid+'" class="btn ghost sm">← Back to dashboard</a><div class="card" style="margin-top:14px"><div class="skel" style="height:280px"></div></div>';
       try{
-        const [analysis, occ, skills]=await Promise.all([
+        const [analysis, occRaw, skills]=await Promise.all([
           window.KaushoraAPI.get("/api/student/"+pid+"/analysis"),
-          window.KaushoraAPI.get("/api/meta/occupations?q="+encodeURIComponent(occId)).then(r=>r.find(x=>x.occupation_id===occId)||r[0]),
+          window.KaushoraAPI.get("/api/meta/occupations?q="+encodeURIComponent(occId)).then(function(r){
+            if (r && r.data && Array.isArray(r.data)) r = r.data;
+            let f = Array.isArray(r) ? r.find(function(x){ return x.occupation_id===occId; }) : null;
+            return f || (Array.isArray(r) ? r[0] : null);
+          }).catch(function(){ return null; }),
           window.KaushoraAPI.get("/api/meta/skills")
         ]);
+        let occ = occRaw;
+        if (!occ) {
+          try {
+            let all = await window.KaushoraAPI.get("/api/meta/occupations");
+            if (all && all.data && Array.isArray(all.data)) all = all.data;
+            occ = Array.isArray(all) ? all.find(function(x){ return x.occupation_id===occId; }) : null;
+          } catch(e) {}
+        }
         const match=analysis.career_matches.find(m=>m.occupation_id===occId);
         if(!match){ page.innerHTML=window.KShell.emptyState("Not a recommended match for you","This occupation was unscored (no explicit skill links) or not in your top matches."); return; }
         render(match, analysis, occ);
