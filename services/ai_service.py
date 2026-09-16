@@ -133,9 +133,38 @@ def build_context(student_id=None, entity=None, entity_id=None):
                             (f"%{entity_id}%",)
                         ).fetchone()["c"]
                 elif entity == "occupation":
-                    r = c2.execute("SELECT role_id, job_title, qp_code FROM job_roles WHERE role_id=?", (entity_id,)).fetchone()
+                    r = c2.execute("SELECT role_id, job_title, qp_code, qp_name, nsqf_level FROM job_roles WHERE role_id=?", (entity_id,)).fetchone()
                     if r:
-                        ctx["entity"] = {"type": "occupation", "id": r["role_id"], "name": r["job_title"], "qp": r["qp_code"]}
+                        ctx["entity"] = {"type": "occupation", "id": r["role_id"], "name": r["job_title"],
+                                         "qp": r["qp_code"], "qp_name": r["qp_name"], "nsqf": r["nsqf_level"]}
+                        # Problem-2 evidence chain: QP/NOS/competencies/skills/coverage
+                        try:
+                            from .analytics_service import occupation_evidence
+                            ev = occupation_evidence(entity_id)
+                            if ev:
+                                ctx["entity"]["qp_detail"] = ev["qp"]
+                                ctx["entity"]["nos"] = [{"code": n["nos_code"], "title": n["nos_title"],
+                                                         "status": n["nos_status"], "confidence": n["confidence"],
+                                                         "observed": n["observed_or_derived"],
+                                                         "source": n["source_id"]} for n in ev["nos"]]
+                                ctx["entity"]["competencies"] = [
+                                    {"nos": x["nos_code"], "text": x["competency_text"]} for x in ev["competencies"]]
+                                ctx["entity"]["required_skills"] = [
+                                    {"id": s["skill_id"], "name": s["skill_name"],
+                                     "nos": s.get("nos_code"), "qp": s.get("qp_code"),
+                                     "confidence": s.get("confidence"),
+                                     "observed": s.get("observed_or_derived"),
+                                     "review": s.get("review_status")} for s in ev["required_skills"]]
+                                ctx["entity"]["candidate_skills"] = [
+                                    {"name": x["skill_name"], "classification": x["classification"]}
+                                    for x in ev["candidate_skills"]]
+                                ctx["entity"]["evidence_coverage"] = ev["coverage"]
+                                ctx["entity"]["evidence_sources"] = [
+                                    {"id": s["source_id"], "title": s["source_name"],
+                                     "url": s.get("source_url"), "status": s.get("source_status")}
+                                    for s in ev["sources"]]
+                        except Exception:
+                            pass
                         # Add job postings for this occupation's skills
                         skill_ids = c2.execute(
                             "SELECT skill_id FROM occupation_skills WHERE occupation_id=?",
@@ -216,6 +245,58 @@ def fallback_answer(question, ctx):
                 f"Top match: {match_txt}. "
                 f"Gaps: {', '.join(g['skill_name'] for g in gaps[:2]) or 'none'}.",
                 _ev(["student_analysis"]))
+    ent = ctx.get("entity") or {}
+    if ent.get("type") == "occupation" and any(k in q for k in ("skill", "requir", "nos", "evidence",
+            "missing", "qualification", "qp", "competenc", "coverage", "source")):
+        name = ent.get("name", "this occupation")
+        req = ent.get("required_skills", [])
+        nos = ent.get("nos", [])
+        cov = ent.get("evidence_coverage", {}) or {}
+        qp = ent.get("qp_detail", {}) or {}
+        evsrc = ent.get("evidence_sources", [])
+        cov_txt = (f"Evidence coverage {cov.get('pct')}% ({cov.get('level')})."
+                   if cov.get("pct") is not None else "Evidence coverage unknown — no researched mappings documented.")
+        qp_txt = f"QP {', '.join(qp.get('codes', [])) or ent.get('qp', '—')}"
+        if qp.get("retired"):
+            qp_txt += " (RETIRED — historical evidence, not a current requirement)"
+        if "which nos" in q or ("nos" in q and "support" in q):
+            hit = None
+            for s in req:
+                if s["id"].lower() in q or s["name"].lower() in q:
+                    hit = s
+                    break
+            if hit:
+                return (f"{hit['name']} ({hit['id']}) for {name} is supported by NOS {hit.get('nos', '—')} "
+                        f"(confidence {hit.get('confidence', '—')}, {hit.get('observed', 'DERIVED')}). {cov_txt}",
+                        _ev(["occupation_skills", "occupation_nos", "nos_competencies"]))
+            nos_list = "; ".join(f"{n['code']} {n['title']} ({n['confidence']})" for n in nos) or "none documented"
+            return (f"No single named skill matched. Documented NOS for {name}: {nos_list}. {cov_txt}",
+                    _ev(["occupation_nos", "nos_competencies"]))
+        if "missing" in q or "what should i learn" in q:
+            have = {s.get("skill_id") for s in (student.get("profile", {}).get("skills", []) if student else [])}
+            if student and have:
+                missing = [s for s in req if s["id"] not in have]
+                if not missing:
+                    return (f"You cover all {len(req)} mapped required skills for {name}. {cov_txt}", _ev(["student_analysis", "occupation_skills"]))
+                ml = "; ".join(f"{s['name']} ({s['id']})" for s in missing)
+                return (f"For {name} you are missing: {ml}. {cov_txt}", _ev(["student_analysis", "occupation_skills"]))
+            rl = "; ".join(f"{s['name']} ({s['id']}, {s.get('confidence', '—')})" for s in req) or "none mapped"
+            return (f"Mapped required skills for {name}: {rl}. Create a student profile to diff these against your skills. {cov_txt}",
+                    _ev(["occupation_skills"]))
+        if "evidence" in q or "source" in q or "coverage" in q:
+            sl = "; ".join(f"{s['id']} ({s.get('status', '')})" for s in evsrc) or "none"
+            n_high = sum(1 for s in req if s.get('confidence') == 'HIGH')
+            n_med = sum(1 for s in req if s.get('confidence') == 'MEDIUM')
+            n_base = sum(1 for s in req if not s.get('confidence'))
+            return (f"Evidence for {name}: {qp_txt}; {len(nos)} NOS units; "
+                    f"{len(ent.get('competencies', []))} documented competencies; {len(req)} canonical skill links "
+                    f"({n_high} HIGH, {n_med} MEDIUM{', ' + str(n_base) + ' observed base' if n_base else ''}); "
+                    f"{len(ent.get('candidate_skills', []))} skills awaiting taxonomy review. "
+                    f"Sources: {sl}. {cov_txt}", _ev(["occupation_nos", "nos_competencies", "occupation_skills", "sources"]))
+        rl = "; ".join(f"{s['name']} ({s['id']})" for s in req) or "none mapped"
+        return (f"{name} — {qp_txt}. Required canonical skills: {rl}. {cov_txt} "
+                f"See /api/occupations/{ent.get('id')}/evidence for the full chain.",
+                _ev(["job_roles", "occupation_skills", "occupation_nos"]))
     if "district" in q or "nagpur" in q or "training centre" in q or "capacity" in q:
         named = "; ".join(
             f"{d['district']}: {d['centres']} centre(s)" + (
@@ -249,8 +330,8 @@ def fallback_answer(question, ctx):
         vac_note = f" {vac['total']} real job postings from Role Radar provide vacancy evidence." if vac.get("total", 0) > 0 else ""
         return (
             "Career matching compares your skills against 33 NSDC occupations with QP codes and NSQF "
-            "levels (including CNC Operator from NCO 2015). Only 4 occupations carry explicit NOS skill links, "
-            f"so matches outside those are reported as unscored rather than zero.{vac_note} "
+            "levels (including CNC Operator from NCO 2015). Only occupations with explicit NOS skill links "
+            f"are scorable, so matches outside those are reported as unscored rather than zero.{vac_note} "
             "5 state-level sector skill gaps (NSDC 2013) and 5 employer survey findings are available as evidence. "
             "Try Careers with e.g. 'Data Entry' or 'Communication'.",
             _ev(["job_roles", "occupation_skills", "courses", "job_postings"]),

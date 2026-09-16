@@ -415,6 +415,9 @@ def analyze_profile(pid):
             "importance": {sid: imp_map.get((oid, sid)) for sid in req},
         })
     scored.sort(key=lambda x: (-x["score"], -x["coverage"], x["occupation_name"]))
+    from .analytics_service import evidence_coverage as _evcov
+    for m in scored:
+        m["evidence_coverage"] = _evcov(m["occupation_id"])
     # unscored occupations
     unscored = [occ for occ in occ_rows if occ["role_id"] not in req_map or not req_map[occ["role_id"]]]
 

@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from services.analytics_service import role_skill_map
+from services.analytics_service import occupation_evidence, role_skill_map
 from services.db import get_db
 from services.skill_gap_service import career_analyze
 
@@ -58,3 +58,13 @@ def analyze():
 @bp.post("/api/career/analyze")
 def analyze_alias():
     return analyze()
+
+
+@bp.get("/api/occupations/<role_id>/evidence")
+def occupation_evidence_api(role_id):
+    """Problem-2 evidence bundle: occupation + QP/status + NOS + competencies +
+    required canonical skills + staged candidates + evidence coverage + sources."""
+    ev = occupation_evidence(role_id)
+    if not ev:
+        return jsonify({"error": "Occupation not found"}), 404
+    return jsonify(ev)

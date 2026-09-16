@@ -35,11 +35,37 @@ def detailed():
         except Exception as e:
             return {"component": name, "status": "Failed", "detail": str(e)[:120]}
 
+    def mapping_healthy():
+        """Problem-2 evidence tables populated with no orphans/dupes/broken refs."""
+        c = get_db()
+        try:
+            if c.execute("SELECT COUNT(*) FROM occupation_nos").fetchone()[0] == 0:
+                return False
+            if c.execute("SELECT COUNT(*) FROM nos_competencies").fetchone()[0] == 0:
+                return False
+            orphans = c.execute(
+                "SELECT COUNT(*) FROM occupation_nos o LEFT JOIN job_roles j"
+                " ON o.occupation_id=j.role_id WHERE j.role_id IS NULL").fetchone()[0]
+            orphans += c.execute(
+                "SELECT COUNT(*) FROM occupation_skills o LEFT JOIN skills s"
+                " ON o.skill_id=s.id WHERE s.id IS NULL").fetchone()[0]
+            orphans += c.execute(
+                "SELECT COUNT(*) FROM occupation_nos o LEFT JOIN sources s"
+                " ON o.source_id=s.source_id WHERE s.source_id IS NULL").fetchone()[0]
+            dupes = c.execute("SELECT COUNT(*) FROM (SELECT occupation_id, nos_code FROM occupation_nos"
+                              " GROUP BY 1,2 HAVING COUNT(*)>1)").fetchone()[0]
+            dupes += c.execute("SELECT COUNT(*) FROM (SELECT occupation_id, skill_id FROM occupation_skills"
+                               " GROUP BY 1,2 HAVING COUNT(*)>1)").fetchone()[0]
+            return orphans == 0 and dupes == 0
+        finally:
+            c.close()
+
     results = []
     results.append(check("Database", lambda: check_db()))
-    results.append(check("Data ingestion", lambda: get_db().execute("SELECT COUNT(*) FROM sources").fetchone()[0] == 10))
+    results.append(check("Data ingestion", lambda: get_db().execute("SELECT COUNT(*) FROM sources").fetchone()[0] >= 10))
     results.append(check("Labour analytics", lambda: len(labour_indicators()) == 15))
-    results.append(check("Skill analytics", lambda: len(compute_skill_demand()) == 20))
+    results.append(check("Skill analytics", lambda: len(compute_skill_demand()) >= 20))
+    results.append(check("Occupation mapping (QP/NOS/skills)", mapping_healthy))
     results.append(check("Course analytics", lambda: get_db().execute("SELECT COUNT(*) FROM courses").fetchone()[0] > 0))
     results.append(check("Curriculum engine", lambda: course_alignment("CRS001") is not None))
     results.append(check("District engine", lambda: get_db().execute("SELECT COUNT(*) FROM districts").fetchone()[0] == 36))

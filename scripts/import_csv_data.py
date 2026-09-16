@@ -14,6 +14,17 @@ Replaces the legacy .md catalog AND deletes all synthetic demo rows:
 
 Single transaction: validation failure rolls back, DB untouched.
 Idempotent: stable PKs, DELETE+INSERT per dataset table.
+
+Problem-2 overlay preservation: the occupation-mapping import
+(scripts/ingest_occupation_mapping.py) adds DSRC_*-sourced rows
+(sources registry, occupation_skills links, qualifications backfill).
+This importer never deletes DSRC-sourced rows, so the overlay survives a
+CSV re-import except for job_roles.qp_code/qp_name and QUA001-013, which
+revert to base values. Recovery order after any CSV re-import:
+  1. python scripts/import_csv_data.py
+  2. python scripts/ingest_new_research_data.py (if used)
+  3. python scripts/ingest_occupation_mapping.py  (restores overlay, idempotent)
+  4. python scripts/ingest_job_postings.py        (restores vacancy junctions)
 """
 import sqlite3
 import sys
@@ -100,18 +111,23 @@ def main():
         c = conn.cursor()
 
         # ---- wipe order: children before parents; synthetic shared tables ----
-        for t in ["occupation_skills", "qualifications", "course_skills", "curriculum",
+        # DSRC_*-sourced rows belong to the Problem-2 overlay and are preserved.
+        for t in ["course_skills", "curriculum",
                   "recommendations", "skill_demand", "district_skill_gaps",
                   "curriculum_alignment_ref", "placements", "skill_aliases",
                   "labour_indicators", "evidence_metrics"]:
             c.execute(f"DELETE FROM {t}")
+        c.execute("DELETE FROM occupation_skills WHERE source_id NOT LIKE 'DSRC\\_%' ESCAPE '\\'")
+        c.execute("DELETE FROM qualifications WHERE source_id NOT LIKE 'DSRC\\_%' ESCAPE '\\'")
         c.execute("DELETE FROM job_postings WHERE is_synthetic=1")
         c.execute("DELETE FROM employer_surveys WHERE is_synthetic=1")
         # district_capacity / training_centres hold no user data: full replace with real rows
         c.execute("DELETE FROM district_capacity")
         c.execute("DELETE FROM training_centres")
-        for t in ["skills", "job_roles", "courses", "districts", "states", "sectors", "sources", "dataset_meta"]:
+        for t in ["skills", "job_roles", "courses", "districts", "states", "sectors", "dataset_meta"]:
             c.execute(f"DELETE FROM {t}")
+        # DSRC_* sources belong to the Problem-2 overlay: preserve them.
+        c.execute("DELETE FROM sources WHERE source_id NOT LIKE 'DSRC\\_%' ESCAPE '\\'")
         # Also clean junction tables that reference deleted parents
         for t in ["job_posting_skills", "job_posting_occupations"]:
             try:
@@ -170,7 +186,9 @@ def main():
         counts["qualifications"] = len(T["qualifications"])
 
         for r in T["occupation_skills"]:
-            c.execute("INSERT INTO occupation_skills VALUES (?,?,?,?,?,?,?)",
+            c.execute("INSERT INTO occupation_skills (occupation_id, skill_id, importance,"
+                      " competency_type, nos_code, source_id, data_source)"
+                      " VALUES (?,?,?,?,?,?,?)",
                       (r["occupation_id"], r["skill_id"], r["importance"], r["competency_type"],
                        r["nos_code"], r["source_id"], "REAL"))
         counts["occupation_skills"] = len(T["occupation_skills"])
@@ -304,8 +322,8 @@ def main():
             "sectors": "13 NSDC/PMKVY sectors.",
             "skills": "20 real skills (SKL001-020); sector derived from linked occupations/courses, NULL where unmapped.",
             "job_roles": "32 real occupations with QP codes + NSQF levels.",
-            "occupation_skills": "10 explicit NOS-coded requirement links across 4 occupations.",
-            "qualifications": "13 active QPs.",
+            "occupation_skills": "Explicit NOS-coded requirement links from the base CSV (see live /api/data/status counts; Problem-2 overlay adds DSRC-sourced links).",
+            "qualifications": "Base QP registry (see live counts; Problem-2 overlay syncs real QP codes + retired statuses).",
             "courses": "15 real ITI courses (Saoner Nagpur + Mumbai) with NSQF levels.",
             "course_skills": "12 explicit Full-coverage course-skill links.",
             "curriculum": "No module breakdown in CSV source; coverage via course_skills.",

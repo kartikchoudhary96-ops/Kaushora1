@@ -22,7 +22,8 @@ TABLES = ["job_roles", "skills", "courses", "course_skills", "curriculum", "tren
           "placements", "district_capacity", "training_centres", "employer_surveys",
           "sources", "states", "districts", "sectors", "occupation_skills", "qualifications",
           "labour_indicators", "evidence_metrics", "skill_demand", "district_skill_gaps",
-          "curriculum_alignment_ref", "recommendations"]
+          "curriculum_alignment_ref", "recommendations",
+          "occupation_nos", "nos_competencies", "new_skill_candidates", "candidate_aliases"]
 
 
 @bp.get("/api/data/status")
@@ -49,6 +50,24 @@ def data_status():
                              {r["sector"] for r in c.execute("SELECT DISTINCT sector FROM courses WHERE sector<>''").fetchall()})
         except Exception:
             sectors = []
+        try:
+            total_roles = c.execute("SELECT COUNT(*) c FROM job_roles").fetchone()["c"]
+            scorable = c.execute("SELECT COUNT(DISTINCT occupation_id) c FROM occupation_skills").fetchone()["c"]
+            mapping = {
+                "scorable_occupations": scorable,
+                "total_occupations": total_roles,
+                "explicit_links": counts.get("occupation_skills", 0),
+                "nos_rows": counts.get("occupation_nos", 0),
+                "competencies": counts.get("nos_competencies", 0),
+                "candidate_skills": counts.get("new_skill_candidates", 0),
+                "retired_qps": c.execute("SELECT COUNT(DISTINCT qp_code) c FROM occupation_nos WHERE qp_status='RETIRED'").fetchone()["c"],
+                "dsrc_sources": c.execute("SELECT COUNT(*) c FROM sources WHERE source_id LIKE 'DSRC\\_%' ESCAPE '\\'").fetchone()["c"],
+                "mapping_sources": [dict(r) for r in c.execute(
+                    "SELECT source_id, source_name, organization, source_url, publication_date, source_status"
+                    " FROM sources WHERE source_id LIKE 'DSRC\\_%' ESCAPE '\\' ORDER BY source_id").fetchall()],
+            }
+        except Exception:
+            mapping = {}
     finally:
         c.close()
     return jsonify(
@@ -58,6 +77,7 @@ def data_status():
                 "dataset_loaded": (counts.get("skills") or 0) > 0,
                 "last_ingestion": last_run,
                 "record_counts": counts,
+                "occupation_mapping": mapping,
                 "available_entities": [t for t in TABLES if (counts.get(t) or 0) > 0],
                 "empty_entities": [t for t in TABLES if (counts.get(t) or 0) == 0],
                 "sectors": sectors,

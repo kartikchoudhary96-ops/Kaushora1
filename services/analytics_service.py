@@ -31,7 +31,7 @@ META = {
         "Per-skill demand signals: 7 skills have observed demand (WEF/NASSCOM), 20 skills remain insufficient.",
         "Labour indicators are state/national level; no district-level PLFS published — never downscaled.",
         "Capacity facts are sparse (3 districts); seats/enrolments mostly unpublished (NULL).",
-        "Explicit occupation-skill links cover 4 of 33 occupations; the rest are honestly unscored.",
+        "Explicit occupation-skill links cover only occupations with researched NOS evidence; the rest are honestly unscored (see live /api/data/status counts).",
         "District skill gaps: 5 state-level sector observations (NSDC 2013), not district-specific.",
         "Placements: 5 aggregate PMKVY records; no course-level or district-level placement data.",
     ],
@@ -58,13 +58,100 @@ def distinct_sectors():
 
 
 def _explicit_role_reqs():
-    """Explicit occupation -> skill mapping from occupation_skills (observed)."""
+    """Explicit occupation -> skill mapping from occupation_skills.
+
+    Includes the 10 observed base rows plus DERIVED Problem-2 overlay rows
+    (DSRC_*-sourced, with qp_code/confidence/observed_or_derived provenance).
+    Staged new_skill_candidates are NOT included (unreviewed)."""
     req = defaultdict(set)
     det = {}
     for r in _rows("SELECT occupation_id, skill_id, importance, competency_type, nos_code FROM occupation_skills"):
         req[r["occupation_id"]].add(r["skill_id"])
         det[(r["occupation_id"], r["skill_id"])] = r
     return req, det
+
+
+def evidence_coverage(role_id):
+    """Transparent evidence coverage for one occupation (DERIVED by Kaushora).
+
+    Formula:
+      coverage = imported_canonical_links / documented_research_mappings
+      documented = imported DSRC links + staged new_skill_candidates rows
+    Career Match (student skills vs known requirements) and Evidence Coverage
+    (how much of the researched evidence Kaushora represents) are different
+    metrics and must be displayed separately. Occupations with no researched
+    mappings return coverage None (honestly unknown, never 0% vs 100%).
+    """
+    imported = _rows("SELECT skill_id, confidence, observed_or_derived, review_status"
+                     " FROM occupation_skills WHERE occupation_id=? AND source_id LIKE 'DSRC\\_%' ESCAPE '\\'",
+                     (role_id,))
+    staged = _rows("SELECT candidate_skill_id, skill_name, classification, confidence"
+                   " FROM new_skill_candidates WHERE occupation_id=?", (role_id,))
+    documented = len(imported) + len(staged)
+    if not documented:
+        return {"imported": 0, "staged": 0, "documented": 0, "pct": None,
+                "level": "Unknown",
+                "note": "No researched occupation-skill mappings documented for this occupation."}
+    pct = round(len(imported) / documented * 100, 1)
+    level = "High" if pct >= 80 else ("Medium" if pct >= 50 else "Limited")
+    return {"imported": len(imported), "staged": len(staged), "documented": documented,
+            "pct": pct, "level": level,
+            "note": (f"{len(imported)} of {documented} researched mappings represented as "
+                     f"canonical skill links; {len(staged)} awaiting skill-taxonomy review.")}
+
+
+def occupation_evidence(role_id):
+    """Full Problem-2 evidence bundle for one occupation (all live from SQLite).
+
+    Returns occupation + QP (with status incl. RETIRED + originating QP for PWD
+    variants) + NOS list + competencies + required canonical skills + staged
+    candidates + evidence coverage + source rows. None if role unknown.
+    """
+    roles = _rows("SELECT role_id, job_title, sector, occupation_code, qp_code, qp_name,"
+                  " nsqf_level, standard_status FROM job_roles WHERE role_id=?", (role_id,))
+    if not roles:
+        return None
+    occ = roles[0]
+    nos_rows = _rows("SELECT * FROM occupation_nos WHERE occupation_id=? ORDER BY nos_code", (role_id,))
+    qp_codes = sorted({r["qp_code"] for r in nos_rows})
+    comp_rows = []
+    if qp_codes:
+        qmarks = ",".join("?" * len(qp_codes))
+        comp_rows = _rows(f"SELECT * FROM nos_competencies WHERE qp_code IN ({qmarks})"
+                          " ORDER BY nos_code, competency_id", qp_codes)
+    req_skills = _rows("SELECT o.skill_id, s.skill_name, o.importance, o.nos_code, o.qp_code,"
+                       " o.confidence, o.observed_or_derived, o.evidence_text, o.review_status"
+                       " FROM occupation_skills o JOIN skills s ON s.id=o.skill_id"
+                       " WHERE o.occupation_id=? ORDER BY o.skill_id", (role_id,))
+    candidates = _rows("SELECT * FROM new_skill_candidates WHERE occupation_id=? ORDER BY skill_name",
+                       (role_id,))
+    src_ids = sorted({r["source_id"] for r in nos_rows + comp_rows
+                      if r.get("source_id")} |
+                     {r.get("source_id") for r in
+                      _rows("SELECT source_id FROM occupation_skills WHERE occupation_id=?", (role_id,))})
+    sources = []
+    if src_ids:
+        qmarks = ",".join("?" * len(src_ids))
+        sources = _rows(f"SELECT source_id, source_name, organization, source_url,"
+                        f" publication_date, source_status FROM sources WHERE source_id IN ({qmarks})",
+                        src_ids)
+    return {"occupation": occ,
+            "qp": {"codes": qp_codes,
+                   "title": nos_rows[0].get("qp_title") if nos_rows else occ.get("qp_name"),
+                   "status": nos_rows[0].get("qp_status") if nos_rows else None,
+                   "originating_qp_code": next((r.get("originating_qp_code") for r in nos_rows
+                                                if r.get("originating_qp_code")), None),
+                   "retired": any(r.get("qp_status") == "RETIRED" for r in nos_rows)},
+            "nos": [{"nos_code": r["nos_code"], "nos_title": r.get("nos_title"),
+                     "nos_status": r.get("nos_status"), "confidence": r.get("confidence"),
+                     "observed_or_derived": r.get("observed_or_derived"),
+                     "source_id": r.get("source_id"), "source_url": r.get("source_url"),
+                     "notes": r.get("notes")} for r in nos_rows],
+            "competencies": comp_rows,
+            "required_skills": req_skills,
+            "candidate_skills": candidates,
+            "coverage": evidence_coverage(role_id),
+            "sources": sources}
 
 
 def role_skill_map():
@@ -370,6 +457,8 @@ def recommendations_live():
             })
     # Engine: occupations without mapped requirements -> mapping rec (sampled)
     req, _ = role_skill_map()
+    total_roles = len(_rows("SELECT role_id FROM job_roles"))
+    n_scored = sum(1 for sids in req.values() if sids)
     unmapped = [rid for rid, sids in req.items() if not sids][:3]
     if unmapped:
         names = {r["role_id"]: r["job_title"] for r in _rows("SELECT role_id, job_title FROM job_roles")}
@@ -381,7 +470,8 @@ def recommendations_live():
             "recommendation_text": "Publish NOS-coded skill requirements for occupations lacking explicit mappings (e.g. %s)" % (
                 ", ".join(f"{rid} {names.get(rid, '')}" for rid in unmapped)),
             "priority": "Low",
-            "reason": "Only 4 of 33 occupations carry explicit occupation-skill links, limiting gap analysis.",
+            "reason": (f"Only {n_scored} of {total_roles} occupations carry explicit occupation-skill links, "
+                       "limiting gap analysis."),
             "supporting_evidence": None, "source_ids": "SRC003,SRC004",
             "is_derived": 1, "data_source": "REAL", "engine": True,
         })

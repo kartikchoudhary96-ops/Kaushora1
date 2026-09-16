@@ -340,6 +340,7 @@ def career_analyze(payload):
 
     role_req, _ = role_skill_map()
     sector_f = (payload.get("target_sector") or "").strip().lower()
+    n_scored = sum(1 for s in role_req.values() if s)
     out_roles, unscored = [], []
     for r in roles:
         if sector_f and sector_f not in (r.get("sector") or "").lower():
@@ -350,7 +351,8 @@ def career_analyze(payload):
                 {
                     "role_id": r["role_id"],
                     "job_title": r["job_title"],
-                    "reason": "No skill requirements mapped to this occupation in the source (only 4 of 32 occupations carry explicit NOS links)",
+                    "reason": (f"No skill requirements mapped to this occupation in the source "
+                               f"(only {n_scored} of {len(roles)} occupations carry explicit skill links)"),
                 }
             )
             continue
@@ -372,6 +374,9 @@ def career_analyze(payload):
             }
         )
     out_roles.sort(key=lambda x: -x["match_score"])
+    from .analytics_service import evidence_coverage as _evcov
+    for rr in out_roles:
+        rr["evidence_coverage"] = _evcov(rr["role_id"])
     top_roles = out_roles[:5]
     rec_courses = []
     if top_roles:
