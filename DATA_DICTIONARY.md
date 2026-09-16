@@ -15,8 +15,12 @@ assessments); `is_observed=1` marks direct source values in `evidence_metrics`.
 | `sectors` | 13 | SEC001–SEC013 (Agriculture…Healthcare) |
 | `skills` | 20 | SKL001–SKL020; `skill_category` ∈ Core/Technical/Occupational/Planning/Compliance; `sector` derived (9 NULL = unmapped, honest) |
 | `job_roles` | 32 | OCC001–OCC032; `occupation_code`, `qp_code` (e.g. ELE/Q3106), `qp_name`, `nsqf_level` (3/3.5/4), `sector_id`, `standard_status`; `related_skills` NULL (explicit table supersedes) |
-| `qualifications` | 13 | QUA001–QUA013 → OCC001–OCC013, NSQF + status Active |
-| `occupation_skills` | 10 | (OCC,SKL) links + `importance` (High/Medium) + `competency_type` + `nos_code`; covers 4 occupations |
+| `qualifications` | 13+ | QUA001–QUA013 → OCC001–OCC013, NSQF + status Active; Problem-2 overlay syncs real QP codes, RETIRED statuses, and backfills QUA014+ (live counts: /api/data/status) |
+| `occupation_skills` | 10+ | Base (OCC,SKL) links + `importance` + `competency_type` + `nos_code`; Problem-2 overlay adds DSRC-sourced DERIVED links with `qp_code`, `mapping_method/source`, `source_url`, `confidence`, `observed_or_derived`, `evidence_text`, `review_status`; covers 9 occupations (live counts: /api/data/status) |
+| `occupation_nos` | 64 | Problem-2: (occupation_id, nos_code) grain; research OCC id + name, `qp_code`, `qp_title`, `originating_qp_code` (PWD variants), `sector_skill_council`, `nsqf_level`, `qp_status` ∈ CURRENT/RETIRED, `nos_code/title/status`, DSRC `source_id/url`, `confidence`, OBSERVED |
+| `nos_competencies` | 63 | Problem-2: COMP_* observed performance requirements + knowledge text per QP/NOS, DSRC-sourced, HIGH/MEDIUM preserved |
+| `new_skill_candidates` | 25 | Problem-2 staging (NOT canonical skills): researched skills without SKL equivalence; `classification` ∈ NEW_SKILL_CANDIDATE/POSSIBLE_DUPLICATE + `possible_skl_match`; all `review_status`=pending; excluded from matching |
+| `candidate_aliases` | 7 | Problem-2 staging for research aliases pointing at candidates or carried with MEDIUM confidence; HIGH aliases resolving to SKL live in `skill_aliases` |
 | `courses` | 15 | CRS001–CRS015; `course_code` (CTS-*), `provider_name` (ITI Saoner Nagpur / ITI Mumbai), `nsqf_level`, `duration`; `skills_taught` denormalized from mapping; `delivery_mode`/`target_roles` NULL (not in source) |
 | `course_skills` | 12 | (CRS,SKL) `coverage_level`=Full + `skill_type`; `proficiency`/`hours` NULL (not published) |
 | `training_centres` | 8 | TC001–TC007 Ahilyanagar (PMKVY) + TC008 ITI Saoner Nagpur (CTS); `centre_type`, `provider`, `scheme`; capacity/enrolment NULL (not published) |

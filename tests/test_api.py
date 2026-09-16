@@ -42,6 +42,10 @@ assert ds["data"]["record_counts"]["job_postings"] == DB.execute("SELECT COUNT(*
 assert DB.execute("SELECT COUNT(*) FROM job_postings WHERE is_synthetic!=0").fetchone()[0] == 0
 assert "job_postings" not in ds["data"]["empty_entities"]
 assert ds["data"]["last_ingestion"]["status"] == "success"
+rc = ds["data"]["record_counts"]
+assert rc["occupation_nos"] == 64 and rc["nos_competencies"] == 63, rc
+assert rc["new_skill_candidates"] == 25 and rc["candidate_aliases"] == 7, rc
+assert rc["occupation_skills"] == 15 and rc["qualifications"] == 34 and rc["sources"] == 45, rc
 print("data/status OK:", ds["data"]["record_counts"])
 
 ov = get("/api/dashboard/overview")
@@ -117,7 +121,11 @@ assert al["missing_count"] == 5 and len(al["partial_skills"]) == 1
 assert any("Plumbing Installation" in r for r in al["recommended_additions"])
 no_cov = get("/api/courses/CRS005/alignment")
 assert no_cov["alignment_score"] is None and no_cov["recommended_action"] == "Cannot assess"
-assert ov["totals"]["avg_alignment"] == 8.3
+# avg_alignment cross-checked live: mean of assessable per-course scores (mirrors dashboard_overview)
+_all_align = [get("/api/courses/%s/alignment" % cc["id"])["alignment_score"] for cc in co]
+_scored = [s for s in _all_align if s is not None]
+assert _scored, "expected at least one assessable course"
+assert ov["totals"]["avg_alignment"] == round(sum(_scored) / len(_scored), 1), ov["totals"]["avg_alignment"]
 print("courses OK: %d courses, CRS001 8.3%% vs OCC013" % len(co))
 
 districts = get("/api/districts")
@@ -145,6 +153,25 @@ assert cr[1]["learning_pathway"] and cr[1]["trend_context"]
 bad_career = post("/api/careers/analyze", {"current_skills": "   "})
 assert bad_career[0] == 400
 print("career OK:", top["job_title"], top["match_score"])
+
+ev15 = get("/api/occupations/OCC015/evidence")
+assert ev15["occupation"]["role_id"] == "OCC015"
+assert ev15["qp"]["codes"] == ["SSC/Q0503"] and ev15["qp"]["retired"] is False
+assert any(n["nos_code"] == "SSC/N0503" for n in ev15["nos"])
+assert any(s["skill_id"] == "SKL012" for s in ev15["required_skills"])
+assert ev15["coverage"]["imported"] == 1 and ev15["coverage"]["documented"] == 2
+assert ev15["coverage"]["pct"] == 50.0 and ev15["coverage"]["level"] == "Medium"
+assert ev15["sources"] and all("source_id" in s for s in ev15["sources"])
+ev_ret = get("/api/occupations/OCC001/evidence")
+assert ev_ret["qp"]["retired"] is True and ev_ret["qp"]["status"] == "RETIRED"
+assert ev_ret["coverage"]["pct"] is None  # Gardener: no researched skill mappings
+assert all("evidence_coverage" in r for r in cr[1]["recommended_roles"])
+try:
+    get("/api/occupations/NOPE/evidence")
+    raise AssertionError("expected 404")
+except urllib.error.HTTPError as e:
+    assert e.code == 404
+print("occupation evidence OK (OCC015 50% Medium, OCC001 retired, coverage on roles)")
 
 sv = post("/api/employers/survey", {"employer_name": "TestCoE2E", "job_role": "Tester",
                                     "skill": "Plumbing Installation", "importance": 5, "hiring_demand": 4})

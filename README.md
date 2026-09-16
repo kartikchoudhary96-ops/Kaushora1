@@ -190,8 +190,9 @@ fallback cites NULL signals explicitly.
 
 - Per-skill demand, district demand, placements, employer requirements:
   unpublished in source → honest insufficient states (no estimates).
-- Explicit occupation-skill links cover 4/32 occupations → partial gap and
-  career coverage (28 roles unscored, stated).
+- Explicit occupation-skill links cover 9/33 occupations (15 links; 24 roles unscored, stated).
+  QP/NOS evidence (DSRC_* NSDC sources: 64 NOS rows, 63 competencies) exists for 32/33
+  occupations with per-occupation evidence coverage; 25 researched skills await taxonomy review.
 - Sparse capacity facts (3 rows, mostly NULL) → recorded as-is, gaps unavailable.
 - Skill sectors derived for 11/20 skills; 9 honestly unmapped.
 - No production hardening (single SQLite file, dev server, session auth).

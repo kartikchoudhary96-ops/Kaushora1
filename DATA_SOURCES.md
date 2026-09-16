@@ -34,6 +34,6 @@ QP/occupation standards 2018–2020 · ITI courses 2024–2026 · PLFS annual 20
 2. No district-level demand or PLFS → no district gaps or disparity index values.
 3. No placement/enrolment outcomes → no placement analytics.
 4. No source employer requirements → only user-observed submissions.
-5. Explicit occupation-skill links for 4/32 occupations → partial gap/career coverage.
+5. Explicit occupation-skill links for 9/33 occupations (15 links) + QP/NOS evidence (DSRC_* sources, 64 NOS rows, 63 competencies) for 32/33 → improved but partial gap/career coverage; 25 researched skills await taxonomy review.
 6. Sparse capacity facts (3 rows, mostly NULL) → capacity shown as recorded, gaps unavailable.
 7. No module-level curriculum → coverage via course-skill links only.

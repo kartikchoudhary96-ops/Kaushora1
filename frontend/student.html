@@ -58,13 +58,17 @@
       h+='<button class="btn ghost sm" onclick="if(confirm(\'Delete profile #'+prof.id+'?\'))fetch(\'/api/student/profile/'+prof.id+'\',{method:\'DELETE\'}).then(()=>location.href=\'student.html\')">Delete</button>';
       h+='</div></div>';
       h+='<h2 class="section">Career Matches</h2><p class="section-sub">Explainable matches from your skills, interests and education.</p>';
-      if(!analysis.career_matches.length) h+=window.KShell.emptyState("No sufficiently supported matches","Only 4 of 32 occupations have explicit skill links; broadening interests may help.");
+      var nScored = (analysis.career_matches||[]).length, nUnscored = (analysis.unscored_occupations||[]).length;
+      if(!analysis.career_matches.length) h+=window.KShell.emptyState("No sufficiently supported matches","Only "+nScored+" of "+(nScored+nUnscored)+" occupations have explicit skill links; broadening interests may help.");
       else h+='<div class="grid cols-2">'+analysis.career_matches.map(m=>{
         var pc = occMap[m.occupation_id] || 0;
         var vacPill = pc > 0 ? '<span class="pill tag-blue" style="font-size:11px">'+pc+' postings</span>' : '';
+        var cov = m.evidence_coverage||{};
+        var covPill = cov.pct==null ? '<span class="pill tag-grey" style="font-size:11px" title="No researched mappings documented">evidence: unknown</span>'
+          : '<span class="pill '+(cov.level==="High"?"tag-green":cov.level==="Medium"?"tag-amber":"tag-red")+'" style="font-size:11px" title="'+esc(cov.note||"")+'">evidence '+cov.pct+'%</span>';
         return '<div class="card career-card"><div style="display:flex;justify-content:space-between;align-items:start"><div><b>'+esc(m.occupation_name)+'</b><br><span style="font-size:12px;color:var(--muted)">'+esc(m.occupation_code||m.occupation_id)+' · '+esc(m.sector||"")+'</span></div><span class="pill '+(m.label==="Strong Match"?"tag-green":m.label==="Potential Match"?"tag-amber":"tag-grey")+'">'+esc(m.label)+'</span></div>'+
         '<div style="margin:8px 0"><b>'+m.score+'%</b> match · '+m.coverage+'% skill coverage <div class="gap-bar" style="margin-top:4px"><i style="width:'+m.coverage+'%"></i></div></div>'+
-        '<p style="font-size:13px"><b>Why:</b> '+ (m.interest_aligned?"Interest aligned":"") +' '+(m.education_ok?"Education ok":"")+' · Matched '+m.matched_skills.length+'/'+m.required_count+' skills '+vacPill+'</p>'+
+        '<p style="font-size:13px"><b>Why:</b> '+ (m.interest_aligned?"Interest aligned":"") +' '+(m.education_ok?"Education ok":"")+' · Matched '+m.matched_skills.length+'/'+m.required_count+' skills '+vacPill+' '+covPill+'</p>'+
         '<div style="margin:8px 0"><b style="font-size:13px">Top gaps:</b> '+(m.missing_skills.slice(0,3).map(sid=>'<span class="pill tag-grey">'+esc(sid)+'</span>').join(" ")||'<span style="color:var(--muted)">None</span>')+'</div>'+
         '<a class="btn ghost sm" href="career-detail.html?profile='+prof.id+'&occ='+m.occupation_id+'">Explore Career</a></div>';
       }).join("")+'</div>';
@@ -91,7 +95,7 @@
       }
       h+='<h2 class="section">Next Actions</h2>';
       h+=analysis.next_actions.map((a,i)=>'<div class="next-action"><div class="num">'+(i+1)+'</div><div><b>'+esc(a.action)+'</b><br><span style="font-size:13px;color:var(--muted)">'+esc(a.reason)+'</span></div></div>').join("");
-      h+='<div class="card" style="margin-top:16px"><h3>Why am I seeing this?</h3><p style="font-size:13px;color:var(--muted)">Data used: your profile (status, skills with proficiency, interests, preferences, location, education) + 32 occupations with explicit NOS links + 15 ITI courses + labour indicators (state-level).<br>Method: '+esc(analysis.methodology.match_score)+'<br>Limitations: only 4 occupations scorable; district demand unpublished.</p><a class="btn ghost sm" href="ai.html">Ask Kaushora AI about your profile</a></div>';
+      h+='<div class="card" style="margin-top:16px"><h3>Why am I seeing this?</h3><p style="font-size:13px;color:var(--muted)">Data used: your profile (status, skills with proficiency, interests, preferences, location, education) + '+(nScored+nUnscored)+' occupations with explicit NOS links + 15 ITI courses + labour indicators (state-level).<br>Method: '+esc(analysis.methodology.match_score)+'<br>Limitations: only '+nScored+' occupations scorable; district demand unpublished.</p><a class="btn ghost sm" href="ai.html">Ask Kaushora AI about your profile</a></div>';
       page.innerHTML=h;
     }
     function esc(s){ return window.KShell.escapeHtml(s); }

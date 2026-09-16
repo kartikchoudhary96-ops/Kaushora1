@@ -86,12 +86,43 @@ def counts_of(dbpath, tables):
 
 TABLES = ["sources", "states", "districts", "sectors", "skills", "job_roles", "courses",
           "course_skills", "training_centres", "labour_indicators", "evidence_metrics", "recommendations"]
+
+
+def overlay_counts(dbpath):
+    """Problem-2 overlay rows that a CSV re-import must preserve."""
+    cx = sqlite3.connect(dbpath)
+    try:
+        out = {}
+        try:
+            out["dsrc_sources"] = cx.execute(
+                "SELECT COUNT(*) FROM sources WHERE source_id LIKE 'DSRC\\_%' ESCAPE '\\'").fetchone()[0]
+            out["dsrc_links"] = cx.execute(
+                "SELECT COUNT(*) FROM occupation_skills WHERE source_id LIKE 'DSRC\\_%' ESCAPE '\\'").fetchone()[0]
+            out["dsrc_qualifications"] = cx.execute(
+                "SELECT COUNT(*) FROM qualifications WHERE source_id LIKE 'DSRC\\_%' ESCAPE '\\'").fetchone()[0]
+        except Exception:
+            out = {"dsrc_sources": 0, "dsrc_links": 0, "dsrc_qualifications": 0}
+        for t in ["occupation_nos", "nos_competencies", "new_skill_candidates", "candidate_aliases"]:
+            try:
+                out[t] = cx.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+            except Exception:
+                out[t] = 0
+        return out
+    finally:
+        cx.close()
+
+
 import_csv_data.DB = Path(tmp)
+overlay_before = overlay_counts(tmp)
 import_csv_data.main()
 after_first = counts_of(tmp, TABLES)
+overlay_after_first = overlay_counts(tmp)
 import_csv_data.main()
 after_second = counts_of(tmp, TABLES)
 assert after_first == after_second, (after_first, after_second)
+# Problem-2 overlay survives CSV re-import (DSRC rows + evidence tables stable)
+assert overlay_before == overlay_after_first, (overlay_before, overlay_after_first)
+assert overlay_after_first == overlay_counts(tmp)
 # users + observed surveys untouched by re-import
 os.remove(tmp)
 print("test_data_import: ALL PASSED")

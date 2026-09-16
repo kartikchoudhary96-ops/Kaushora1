@@ -60,11 +60,15 @@
         if (!r.recommended_roles.length) {
           h += window.KShell.emptyState("No scorable roles", "None of the catalogued roles map to the current skill catalog for this filter. Try a different sector.");
         } else {
-          h += '<h2 class="section">Recommended roles</h2><div class="table-wrap"><table class="data"><thead><tr><th>Role</th><th>Sector</th><th>Match</th><th>Missing skills</th></tr></thead><tbody>';
+          h += '<h2 class="section">Recommended roles</h2><div class="table-wrap"><table class="data"><thead><tr><th>Role</th><th>Sector</th><th>Match</th><th>Evidence</th><th>Missing skills</th></tr></thead><tbody>';
           r.recommended_roles.forEach(function (x) {
+            var cov = x.evidence_coverage||{};
+            var covCell = cov.pct==null ? '<span class="pill tag-grey">unknown</span>'
+              : '<span class="pill '+(cov.level==="High"?"tag-green":cov.level==="Medium"?"tag-amber":"tag-red")+'" title="'+esc(cov.note||"")+'">'+cov.pct+'% '+esc(cov.level)+'</span>';
             h += "<tr><td><b>" + esc(x.job_title) + "</b><br><span style='color:var(--muted);font-size:12px'>" + esc(x.role_id) + "</span></td>" +
               "<td>" + esc(x.sector || "—") + "</td>" +
               '<td style="min-width:150px"><b>' + x.match_score + '%</b><div class="meter"><i style="width:' + x.match_score + '%"></i></div></td>' +
+              "<td>" + covCell + "</td>" +
               "<td>" + (x.missing_skills.length ? x.missing_skills.map((m) => '<a href="skill-detail.html?id=' + encodeURIComponent(m.skill_id) + '">' + esc(m.skill_name) + "</a>").join(", ") : "<i>none</i>") + "</td></tr>";
           });
           h += "</tbody></table></div>";

@@ -29,14 +29,15 @@
         const occ=occList.find(o=>o.occupation_id===id)||occList[0];
         if(!occ) throw new Error("Occupation not found");
         // fetch occupation_skills and related courses via dedicated endpoint? Use career/roles and course skills
-        const [reqMap, courseMap] = await Promise.all([
+        const [reqMap, courseMap, ev] = await Promise.all([
           window.KaushoraAPI.get("/api/careers/roles").then(r=>r.find(x=>x.role_id===id)),
-          window.KaushoraAPI.get("/api/courses").then(cs=>cs.filter(c=>c.sector===occ.sector))
+          window.KaushoraAPI.get("/api/courses").then(cs=>cs.filter(c=>c.sector===occ.sector)),
+          window.KaushoraAPI.get("/api/occupations/"+encodeURIComponent(id)+"/evidence").catch(function(){ return null; })
         ]);
-        render(occ, reqMap, courseMap);
+        render(occ, reqMap, courseMap, ev);
       }catch(e){ page.innerHTML='<a href="occupation.html" class="btn ghost sm">← All occupations</a><div style="margin-top:14px">'+window.KShell.errorState(e.message,"reload")+ '</div>'; window.reload=()=>load(); }
     }
-    function render(occ, reqMap, relatedCourses){
+    function render(occ, reqMap, relatedCourses, ev){
       document.title=occ.occupation_name+" — Kaushora";
       let h='<a href="occupation.html" class="btn ghost sm">← All occupations</a>';
       h+='<div class="eyebrow" style="margin-top:14px">'+esc(occ.sector||"")+' · NSQF '+esc(occ.nsqf_level||"")+' · <code>'+esc(occ.occupation_code||occ.occupation_id)+'</code></div>';
@@ -47,10 +48,48 @@
         '<div class="card kpi"><div class="k-label">Job postings</div><div class="k-value">'+pcPill+'</div><div class="k-sub">Real LinkedIn postings</div></div>'+
         '<div class="card kpi"><div class="k-label">Related qualifications</div><div class="k-value">1</div><div class="k-sub">'+esc(occ.qp_code||"")+'</div></div>'+
         '<div class="card kpi"><div class="k-label">Sector</div><div class="k-value" style="font-size:18px;padding:10px 0">'+esc(occ.sector||"—")+'</div><div class="k-sub">NSDC sector</div></div></div>';
+      // Problem-2 evidence chain
+      if(ev){
+        var cov = ev.coverage||{};
+        var covPill = cov.pct==null ? '<span class="pill tag-grey">Unknown</span>'
+          : '<span class="pill '+(cov.level==="High"?"tag-green":cov.level==="Medium"?"tag-amber":"tag-red")+'">'+cov.pct+'% '+esc(cov.level)+'</span>';
+        h+='<div class="card" style="margin-top:16px;border-left:4px solid var(--pistachio)"><h3>Qualification Pack & evidence coverage '+covPill+'</h3>';
+        h+='<p style="font-size:13px">QP: <code>'+esc((ev.qp.codes||[]).join(", ")||occ.qp_code||"—")+'</code> '+
+          (ev.qp.title?'· '+esc(ev.qp.title):"")+' '+
+          (ev.qp.status?'<span class="pill '+(ev.qp.status==="RETIRED"?"tag-red":"tag-green")+'">'+esc(ev.qp.status)+'</span>':"")+'</p>';
+        if(ev.qp.retired) h+='<p class="hint">This QP is RETIRED — evidence is historical and kept for traceability, not treated as a current requirement.</p>';
+        if(ev.qp.originating_qp_code) h+='<p class="hint">PwD-adapted QP; originating QP <code>'+esc(ev.qp.originating_qp_code)+'</code> is the primary identifier.</p>';
+        if(cov.pct!=null) h+='<p class="hint">'+esc(cov.note||"")+'</p>';
+        else h+='<p class="hint">'+esc(cov.note||"Limited evidence available.")+'</p>';
+        h+='</div>';
+        if((ev.required_skills||[]).length){
+          h+='<div class="card" style="margin-top:16px"><h3>Required canonical skills (evidence-backed)</h3><div class="table-wrap"><table class="data"><thead><tr><th>Skill</th><th>NOS</th><th>Confidence</th><th>Observed/Derived</th></tr></thead><tbody>'+
+            ev.required_skills.map(function(s){
+              return '<tr><td><b>'+esc(s.skill_name)+'</b><br><span style="font-size:12px;color:var(--muted)">'+esc(s.skill_id)+'</span></td><td><code>'+esc(s.nos_code||"")+'</code></td>'+
+              '<td><span class="pill '+(s.confidence==="MEDIUM"?"tag-amber":"tag-green")+'">'+esc(s.confidence||"—")+'</span>'+(s.review_status?' <span class="pill tag-grey">review pending</span>':"")+'</td>'+
+              '<td><span class="pill '+(s.observed_or_derived==="OBSERVED"?"tag-green":"tag-amber")+'">'+esc(s.observed_or_derived||"")+'</span></td></tr>';
+            }).join("")+'</tbody></table></div></div>';
+        }
+        if((ev.nos||[]).length){
+          h+='<div class="card" style="margin-top:16px"><h3>NOS evidence ('+ev.nos.length+' units)</h3><div class="table-wrap"><table class="data"><thead><tr><th>NOS</th><th>Title</th><th>Status</th><th>Source</th></tr></thead><tbody>'+
+            ev.nos.map(function(n){
+              return '<tr><td><code>'+esc(n.nos_code)+'</code></td><td>'+esc(n.nos_title||"")+'</td>'+
+              '<td><span class="pill '+(n.nos_status==="RETIRED"?"tag-red":"tag-green")+'">'+esc(n.nos_status||"—")+'</span></td>'+
+              '<td style="font-size:12px">'+esc(n.source_id||"")+(n.source_url?' · <a href="'+esc(n.source_url)+'" target="_blank" rel="noopener">QP PDF</a>':"")+'</td></tr>';
+            }).join("")+'</tbody></table></div>';
+          if((ev.competencies||[]).length) h+='<p class="hint">'+ev.competencies.length+' documented competencies underpin these NOS units (see AI grounding for full text).</p>';
+          h+='</div>';
+        }
+        if((ev.candidate_skills||[]).length){
+          h+='<div class="card" style="margin-top:16px"><h3>Skills awaiting taxonomy review ('+ev.candidate_skills.length+')</h3><p>'+
+            ev.candidate_skills.map(function(x){ return '<span class="pill tag-grey">'+esc(x.skill_name)+' ('+esc(x.classification)+')</span>'; }).join(" ")+
+            '</p><p class="hint">Researched from NOS competencies but not yet confirmed as canonical Kaushora skills — excluded from career matching until reviewed.</p></div>';
+        }
+      }
       if(reqMap && reqMap.required_skills && reqMap.required_skills.length){
         h+='<div class="card" style="margin-top:16px"><h3>Required skills (observed)</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'+reqMap.required_skills.map(sid=>'<span class="pill tag-green">'+esc(sid)+'</span>').join("")+'</div><p class="hint">From explicit NOS-coded occupation-skill links (observed, never inferred).</p></div>';
       } else {
-        h+='<div class="empty">'+window.KIcon("info")+'<h3>No explicit skill requirements published</h3><p>Only 4 of 32 occupations carry published NOS skill links. This occupation shows honestly as unscored.</p></div>';
+        h+='<div class="empty">'+window.KIcon("info")+'<h3>No explicit skill requirements published</h3><p>This occupation has no researched NOS skill links yet. It shows honestly as unscored — never estimated.</p></div>';
       }
       h+='<div class="card" style="margin-top:16px"><h3>Relevant courses</h3><p class="hint">Same-sector ITI courses with recorded coverage.</p>';
       if(!relatedCourses.length) h+='<p class="hint">No same-sector courses recorded.</p>';

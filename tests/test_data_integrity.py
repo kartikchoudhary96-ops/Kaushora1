@@ -54,13 +54,32 @@ assert c.execute("SELECT COUNT(*) FROM skills WHERE source_url IS NULL OR source
 assert c.execute("SELECT COUNT(*) FROM job_roles WHERE source_url IS NULL OR source_url=''").fetchone()[0] == 0
 assert c.execute("SELECT COUNT(*) FROM courses WHERE source_url IS NULL OR source_url=''").fetchone()[0] == 0
 
-# required non-empty tables genuinely populated (updated counts after new research package)
-for tbl, n in [("sources", 12), ("states", 2), ("districts", 36), ("sectors", 13), ("skills", 27),
-               ("job_roles", 33), ("courses", 29), ("course_skills", 12), ("occupation_skills", 10),
-               ("qualifications", 14), ("training_centres", 8), ("labour_indicators", 15),
+# required non-empty tables genuinely populated (base CSV + research packages + Problem-2 overlay)
+for tbl, n in [("sources", 45), ("states", 2), ("districts", 36), ("sectors", 13), ("skills", 27),
+               ("job_roles", 33), ("courses", 29), ("course_skills", 12), ("occupation_skills", 15),
+               ("qualifications", 34), ("training_centres", 8), ("labour_indicators", 15),
                ("evidence_metrics", 14), ("recommendations", 3), ("trends", 9),
-               ("skill_demand", 7), ("placements", 5), ("skill_aliases", 52)]:
+               ("skill_demand", 7), ("placements", 5), ("skill_aliases", 52),
+               ("occupation_nos", 64), ("nos_competencies", 63),
+               ("new_skill_candidates", 25), ("candidate_aliases", 7)]:
     assert c.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0] == n, (tbl, n)
+
+# Problem-2 overlay integrity
+assert c.execute("SELECT COUNT(*) FROM occupation_skills WHERE source_id NOT LIKE 'DSRC\\_%' ESCAPE '\\'").fetchone()[0] == 10
+assert c.execute("SELECT COUNT(*) FROM occupation_skills WHERE source_id LIKE 'DSRC\\_%' ESCAPE '\\'").fetchone()[0] == 5
+assert c.execute("SELECT COUNT(*) FROM occupation_skills WHERE confidence='MEDIUM'").fetchone()[0] == 1
+assert c.execute("SELECT COUNT(*) FROM occupation_nos WHERE qp_status='RETIRED'").fetchone()[0] == 6
+assert c.execute("SELECT COUNT(*) FROM occupation_nos WHERE qp_code LIKE 'PWD%' AND originating_qp_code IS NULL").fetchone()[0] == 0
+assert c.execute("SELECT COUNT(*) FROM new_skill_candidates WHERE review_status!='pending' OR review_status IS NULL").fetchone()[0] == 0
+assert c.execute("SELECT COUNT(*) FROM occupation_nos WHERE occupation_id NOT IN (SELECT role_id FROM job_roles)").fetchone()[0] == 0
+assert c.execute("SELECT COUNT(*) FROM occupation_nos WHERE source_id NOT IN (SELECT source_id FROM sources)").fetchone()[0] == 0
+assert c.execute("SELECT COUNT(*) FROM nos_competencies WHERE source_id NOT IN (SELECT source_id FROM sources)").fetchone()[0] == 0
+assert c.execute("SELECT COUNT(*) FROM new_skill_candidates WHERE occupation_id NOT IN (SELECT role_id FROM job_roles)").fetchone()[0] == 0
+assert c.execute("SELECT occupation_id, nos_code, COUNT(*) FROM occupation_nos GROUP BY 1,2 HAVING COUNT(*)>1").fetchall() == []
+assert c.execute("SELECT competency_id, COUNT(*) FROM nos_competencies GROUP BY 1 HAVING COUNT(*)>1").fetchall() == []
+# research skill IDs must never leak into the canonical taxonomy
+assert c.execute("SELECT COUNT(*) FROM skills WHERE id LIKE 'SK\\_%' ESCAPE '\\'").fetchone()[0] == 0
+assert c.execute("SELECT COUNT(*) FROM occupation_skills WHERE skill_id LIKE 'SK\\_%' ESCAPE '\\'").fetchone()[0] == 0
 
 # honestly-empty tables stay empty (source carries none)
 for tbl in ["curriculum"]:

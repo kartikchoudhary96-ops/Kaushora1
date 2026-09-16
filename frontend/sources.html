@@ -25,6 +25,10 @@
     function render(ds, evidence){
       const srcCount = ds.record_counts ? ds.record_counts.sources : 12;
       const evCount = evidence.length || 14;
+      const om = ds.occupation_mapping || {};
+      const mapLine = om.total_occupations
+        ? '<li>Explicit skill links: '+om.scorable_occupations+'/'+om.total_occupations+' occupations scorable ('+om.explicit_links+' links, '+om.nos_rows+' NOS rows, '+om.competencies+' competencies); '+om.candidate_skills+' skills awaiting taxonomy review; '+om.retired_qps+' retired QPs flagged historical — rest unscored.</li>'
+        : '<li>Explicit skill links cover only researched occupations — rest unscored.</li>';
       let h='<div class="eyebrow">Evidence & provenance</div><h1 class="title">Sources & Methodology</h1><p class="subtitle">Every figure traces to a public record or a documented derivation.</p>';
       h+='<h2 class="section">Data sources ('+srcCount+')</h2><p class="section-sub">Registered provenance for every record.</p><div class="grid cols-2">';
       // actual sources table from dataset_meta (sections with methodology)
@@ -32,6 +36,16 @@
       h+='<div class="card" style="grid-column:1/-1"><div class="table-wrap"><table class="data"><thead><tr><th>Section</th><th>Methodology</th><th>Records</th></tr></thead><tbody>'+
         meta.map(m=>'<tr><td><b>'+esc(m.section||"")+'</b></td><td style="font-size:12px">'+esc(m.methodology_note||"")+'</td><td>'+(m.record_count||0)+'</td></tr>').join("")+
         '</tbody></table></div></div></div>';
+      h+='<h2 class="section">Occupation-mapping provenance (DSRC_*)</h2><p class="section-sub">NSDC Qualification Pack evidence behind occupation → NOS → skill links.</p>';
+      const msrc = (ds.occupation_mapping && ds.occupation_mapping.mapping_sources) || [];
+      if(msrc.length){
+        h+='<div class="card"><div class="table-wrap"><table class="data"><thead><tr><th>Source</th><th>Publisher</th><th>Status</th></tr></thead><tbody>'+
+          msrc.map(function(s){
+            return '<tr><td><b>'+esc(s.source_id)+'</b> — '+esc(s.source_name)+(s.source_url?' <a href="'+esc(s.source_url)+'" target="_blank" rel="noopener">QP PDF</a>':"")+'</td><td>'+esc(s.organization||"")+'</td><td><span class="pill '+(s.source_status==="RETIRED"?"tag-red":"tag-green")+'">'+esc(s.source_status||"")+'</span></td></tr>';
+          }).join("")+'</tbody></table></div></div>';
+      } else {
+        h+='<div class="card"><p class="hint">Occupation-mapping sources not yet imported.</p></div>';
+      }
       h+='<h2 class="section">Observed vs Derived</h2><div class="grid cols-2"><div class="card"><h3>Observed (source data)</h3><p class="hint">Directly published: PLFS indicators, NSDC QP codes, PMKVY centre counts, ITI courses, evidence metrics. Labelled <span class="pill tag-green">Source data</span>.</p></div>'+
         '<div class="card"><h3>Derived (Kaushora)</h3><p class="hint">Calculated: alignment scores, career matches, gap prioritization, recommendations. Labelled <span class="pill tag-amber">Derived by Kaushora</span> with formula.</p></div></div>';
       h+='<h2 class="section">Citable evidence metrics ('+evCount+')</h2><div class="grid cols-3">'+evidence.map(e=>'<div class="card kpi"><div class="k-label">'+esc(e.metric_name)+'</div><div class="k-value" style="font-size:20px">'+esc(e.metric_value)+' '+(e.unit||"")+'</div><div class="k-sub">'+esc(e.geography||"")+' · '+esc(e.time_period||"")+'</div><span class="k-tag tag-green">Source data</span></div>').join("")+'</div>';
@@ -39,7 +53,7 @@
         '<li>Per-skill demand: unpublished → <b>Insufficient data</b>, never estimated.</li>'+
         '<li>District demand/PLFS: state/national only — never downscaled.</li>'+
         '<li>Placements/seats: mostly unpublished (NULL).</li>'+
-        '<li>Explicit skill links: 4/32 occupations — rest unscored.</li>'+
+        mapLine+
         '</ul></div>';
       h+='<div class="evidence-strip">'+window.KIcon("shield")+'<div><b>Traceability.</b> Every analytical output links to its source row(s) via <code>source_id</code> and is reproducible from the CSV dataset + deterministic code. No synthetic rows exist.</div></div>';
       page.innerHTML=h;
