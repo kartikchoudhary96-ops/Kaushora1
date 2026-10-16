@@ -74,10 +74,10 @@ def detailed():
     results.append({"component": "API", "status": "Working", "detail": "/api/* reachable"})
     # AI
     try:
-        from services.ai_service import _gemini_key
-        has_key = bool(_gemini_key())
+        from services.ai_service import _ollama_key
+        has_key = bool(_ollama_key())
         results.append({"component": "Kaushora AI", "status": "Working" if has_key else "Warning",
-                        "detail": "Gemini key configured" if has_key else "No API key — fallback active"})
+                        "detail": "Ollama key configured" if has_key else "No API key — fallback active"})
     except Exception as e:
         results.append({"component": "Kaushora AI", "status": "Failed", "detail": str(e)[:80]})
     results.append({"component": "Frontend/API connection", "status": "Working", "detail": "Relative /api/... (same-origin)"})

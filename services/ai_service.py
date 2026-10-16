@@ -1,7 +1,7 @@
 """Kaushora AI: grounded assistant over the real public dataset.
 
 Flow: question -> retrieve relevant Kaushora records + derived analytics ->
-structured context -> Gemini (if GEMINI_API_KEY) else deterministic fallback.
+structured context -> Ollama cloud (if OLLAMA_API_KEY) else deterministic fallback.
 The model/API is never the source of numerical truth; every figure in an
 answer resolves to a database row or a documented derivation. Where the
 dataset lacks evidence, the assistant says so explicitly.
@@ -14,8 +14,8 @@ import os
 import urllib.request
 
 
-def _gemini_key():
-    return os.environ.get("GEMINI_API_KEY", "").strip()
+def _ollama_key():
+    return os.environ.get("OLLAMA_API_KEY", "").strip()
 
 
 def build_context(student_id=None, entity=None, entity_id=None):
@@ -386,11 +386,53 @@ def fallback_answer(question, ctx):
 
 SYSTEM_PROMPT = (
     "You are Kaushora AI, the labour-market intelligence assistant for Kaushora. "
-    "Use only the provided Kaushora context for factual claims about Kaushora's dataset. "
-    "Do not invent statistics, jobs, employers, skills, courses, districts or trends. "
-    "Clearly distinguish calculated metrics from source observations. "
-    "If the provided context is insufficient, state that the available data is insufficient. Be concise."
+    "Answer in two modes. MODE 1 — Kaushora-dataset questions (jobs, skills, courses, "
+    "occupations, districts, employers, indicators, trends, statistics, or anything about "
+    "the CONTEXT below): use only the provided Kaushora context. Do not invent statistics, "
+    "jobs, employers, skills, courses, districts or trends. Clearly distinguish calculated "
+    "metrics from source observations. If the provided context is insufficient, state that "
+    "the available data is insufficient. "
+    "MODE 2 — general questions unrelated to Kaushora data (e.g. capitals, science, "
+    "history, how-to explainers): answer normally from your own knowledge, and start your "
+    "answer with exactly this marker on its own line: [General knowledge]. "
+    "Be concise. "
+    "FORMAT — shape every answer identically: line 1 = the direct answer in one sentence. "
+    "Then 2-4 bullet lines, each starting with '• ' and under 20 words. "
+    "Then a final line starting with 'Source: ' stating the origin (Kaushora records, or "
+    "general knowledge). Plain text only — no markdown tables, no extra headings."
 )
+
+# Dataset-topic keywords: used only to decide whether the deterministic fallback
+# (no live model) can attempt an answer. Anything without these is outside the
+# dataset, and only the live model may answer it.
+_DATASET_RE = None
+
+
+def _dataset_question(question):
+    """True if the question looks like it concerns Kaushora data."""
+    global _DATASET_RE
+    if _DATASET_RE is None:
+        import re
+        _DATASET_RE = re.compile(
+            r"skill|demand|job|career|occupation|qp\b|nos\b|course|curriculum|align"
+            r"|district|nagpur|training|cent(er|re)|capacit|seat|iti\b|nsqf"
+            r"|indicator|lfpr|\bwpr\b|unemploy|plfs|wage|trend|emerg|grow|ncs\b"
+            r"|vacan|posting|employer|survey|recommend|priority|gap|evidence|source"
+            r"|kaushora|profil|my |learn|miss|sector|placement|labour|labor",
+            re.IGNORECASE,
+        )
+    return bool(_DATASET_RE.search(question or ""))
+
+
+def _general_unavailable(question):
+    """Envelope for out-of-dataset questions when the live model can't be reached."""
+    return {"answer": ("This question is outside the Kaushora dataset, and the live "
+                       "model is currently unreachable, so I cannot answer it right now. "
+                       "Retry in a moment, or ask about Kaushora jobs, skills, courses, "
+                       "occupations or districts."),
+            "evidence": [], "data_source": "GENERAL",
+            "grounded": False, "ai_available": False,
+            "note": "Out-of-dataset question with no live model — deterministic fallback covers dataset questions only."}
 
 
 def ask_ai(question, context=None, student_id=None, entity=None, entity_id=None):
@@ -399,30 +441,45 @@ def ask_ai(question, context=None, student_id=None, entity=None, entity_id=None)
     # also merge any caller-supplied context (e.g. legacy tests)
     if context and isinstance(context, dict):
         ctx.update({k: v for k, v in context.items() if k not in ctx})
-    key = _gemini_key()
+    key = _ollama_key()
     if not key:
+        if not _dataset_question(question):
+            return _general_unavailable(question)
         answer, evidence = fallback_answer(question, ctx)
         return {"answer": answer, "evidence": evidence, "data_source": "REAL",
                 "grounded": True, "ai_available": False,
-                "note": "Kaushora AI model unavailable (no API key). Deterministic grounded fallback from live database context."}
+                "note": "Kaushora AI model unavailable (no OLLAMA_API_KEY). Deterministic grounded fallback from live database context."}
     slim = {"totals": ctx.get("totals"), "weakest_alignments": ctx.get("weakest_alignments"),
             "districts_with_centres": ctx.get("districts_with_centres"),
             "indicators": ctx.get("indicators"), "evidence": ctx.get("evidence"),
             "recommendations": ctx.get("recommendations"),
             "skills": ctx.get("skills"), "trends": ctx.get("trends")}
     prompt = SYSTEM_PROMPT + "\nCONTEXT (Kaushora database extracts):\n" + json.dumps(slim)[:5000] + "\nQUESTION:\n" + (question or "")
-    model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+    model = os.environ.get("OLLAMA_MODEL", "gemma4:31b")
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-        body = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
-        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-        with urllib.request.urlopen(req, timeout=20) as r:
+        url = "https://ollama.com/api/chat"
+        body = json.dumps({
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+        }).encode()
+        req = urllib.request.Request(url, data=body, headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + key,
+        }, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as r:
             j = json.loads(r.read().decode())
-        txt = j["candidates"][0]["content"]["parts"][0]["text"]
+        txt = j["message"]["content"]
+        if txt.lstrip().startswith("[General knowledge]"):
+            return {"answer": txt, "evidence": [],
+                    "data_source": "GENERAL", "grounded": False, "ai_available": True,
+                    "note": f"General-knowledge answer from Ollama ({model}); not sourced from Kaushora data."}
         return {"answer": txt, "evidence": _ev(["dashboard_overview", "indicators", "alignments", "districts"]),
                 "data_source": "REAL", "grounded": True, "ai_available": True,
-                "note": "Generated with Gemini over retrieved Kaushora records; numbers come from backend analytics."}
+                "note": f"Generated with Ollama ({model}) over retrieved Kaushora records; numbers come from backend analytics."}
     except Exception as e:
+        if not _dataset_question(question):
+            return _general_unavailable(question)
         answer, evidence = fallback_answer(question, ctx)
         return {"answer": answer, "evidence": evidence, "data_source": "REAL",
                 "grounded": True, "ai_available": False,

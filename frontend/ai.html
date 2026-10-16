@@ -47,7 +47,7 @@
         else if(ctx.entity) ctxNote='<div class="pill tag-blue" style="margin-bottom:8px">'+esc(ctx.entity)+' '+esc(ctx.entity_id)+' context</div>';
         page.innerHTML =
           '<div class="eyebrow">Grounded assistant</div><h1 class="title">Kaushora AI</h1>' +
-          '<p class="subtitle">Answers strictly reflect retrieved Kaushora records + derived analytics. Statistics are never invented — where evidence is missing, it says so.</p>' +ctxNote+
+          '<p class="subtitle">Dataset questions are answered strictly from retrieved Kaushora records + derived analytics — statistics are never invented. General questions are answered from model knowledge and labeled as such.</p>' +ctxNote+
           '<div class="chat-wrap"><div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="presets">' +
           PRESETS.map((p) => '<button class="chip preset" data-q="' + esc(p) + '">' + esc(p) + "</button>").join("") + "</div>" +
           '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="quick">'+
@@ -58,8 +58,8 @@
           '<div><div class="card"><div class="eyebrow">Data inspector</div><h3>Live audit</h3><div id="inspector"><div class="skel" style="height:120px"></div></div></div>' +
           '<div class="card" style="margin-top:16px"><div class="eyebrow">How answers are built</div><h3>Synthesis pipeline</h3>' +
           '<div class="audit-step"><span class="num">1</span><div><b>Retrieve context</b><br><span style="color:var(--muted)">Live DB: profile + matches + gaps + indicators + evidence.</span></div></div>' +
-          '<div class="audit-step"><span class="num">2</span><div><b>Grounded prompt</b><br><span style="color:var(--muted)">Model sees only retrieved numbers.</span></div></div>' +
-          '<div class="audit-step"><span class="num">3</span><div><b>Model or fallback</b><br><span style="color:var(--muted)">Gemini if key, else deterministic summary.</span></div></div>' +
+           '<div class="audit-step"><span class="num">2</span><div><b>Grounded prompt</b><br><span style="color:var(--muted)">Dataset questions see only retrieved numbers; general questions use model knowledge.</span></div></div>' +
+           '<div class="audit-step"><span class="num">3</span><div><b>Model or fallback</b><br><span style="color:var(--muted)">Ollama (gemma4:31b) if key, else deterministic summary.</span></div></div>' +
           '<div class="audit-step"><span class="num">4</span><div><b>Traceability</b><br><span style="color:var(--muted)">Every answer cites source rows.</span></div></div></div>' +
           '<div class="card" style="margin-top:16px"><div class="eyebrow">Try</div><p style="font-size:13px;margin:0">Append <code>?student_id=1</code> to this URL after creating a profile to get student-aware answers.</p></div></div></div>';
         document.querySelectorAll(".preset,.chip").forEach((b) => b.addEventListener("click", () => { if(b.dataset.q){ document.getElementById("q").value = b.dataset.q; ask(); } }));
@@ -100,13 +100,38 @@
           const r = await window.KaushoraAPI.post("/api/ai/chat", payload);
           let ev="";
           if(r.evidence && r.evidence.length) ev='<div style="margin-top:8px;font-size:12px;color:var(--muted)">Evidence: '+r.evidence.map(e=>'<span class="pill tag-grey">'+esc(e.source||e.data_source||"REAL")+'</span>').join(" ")+'</div>';
-          thinking.innerHTML = esc(r.answer) + ev + '<div class="meta">' +
-            (r.ai_available ? "Generated with live model over retrieved Kaushora records." : esc(r.note || "Structured grounded fallback.")) + (r.data_source?' · <span class="pill tag-green">'+esc(r.data_source)+'</span>':'') + (r.grounded?' · grounded':'') + "</div>";
+          thinking.innerHTML = formatAnswer(r.answer) + ev + '<div class="meta">' +
+            (r.ai_available ? esc(r.note || "Generated with live model over retrieved Kaushora records.") : esc(r.note || "Structured grounded fallback.")) + (r.data_source?' · <span class="pill tag-green">'+esc(r.data_source)+'</span>':'') + (r.grounded?' · grounded':'') + "</div>";
         } catch (e) {
           thinking.innerHTML = "<b>Request failed.</b> " + esc(e.message);
         } finally { btn.disabled = false; btn.textContent = "Query"; log.scrollTop = log.scrollHeight; }
       }
       function esc(s) { return window.KShell.escapeHtml(s); }
+      // Structured render: escape first (XSS-safe), then shape bullets/bold/paragraphs.
+      function formatAnswer(raw) {
+        let txt = raw || "";
+        let badge = "";
+        if (txt.indexOf("[General knowledge]") === 0) {
+          badge = '<span class="pill tag-blue" style="margin-bottom:8px;display:inline-block">General knowledge — not from Kaushora data</span>';
+          txt = txt.replace(/^\[General knowledge\]\s*/, "");
+        }
+        let html = esc(txt);
+        html = html.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+        const lines = html.split("\n");
+        let out = "", inList = false;
+        lines.forEach(function (ln) {
+          const t = ln.trim();
+          if (/^[•\-*]\s+/.test(t)) {
+            if (!inList) { out += "<ul>"; inList = true; }
+            out += "<li>" + t.replace(/^[•\-*]\s+/, "") + "</li>";
+          } else {
+            if (inList) { out += "</ul>"; inList = false; }
+            if (t) out += "<p style='margin:6px 0'>" + ln.trim() + "</p>";
+          }
+        });
+        if (inList) out += "</ul>";
+        return badge + out;
+      }
       load();
     })();
   </script>
