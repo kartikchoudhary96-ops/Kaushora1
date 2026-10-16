@@ -14,6 +14,8 @@ from flask import Flask  # noqa: E402
 
 app = Flask(__name__, static_folder=str(FRONT), static_url_path="")
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "kaushora-demo-secret")
+# Never cache frontend files in the browser: edits must appear immediately.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 from routes.ai_routes import bp as ai_bp  # noqa: E402
 from routes.career_routes import bp as career_bp  # noqa: E402

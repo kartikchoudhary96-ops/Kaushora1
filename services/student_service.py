@@ -72,12 +72,50 @@ def _norm_status(v):
     return next((x for x in STATUS_OPTIONS if x.lower() == (v or "").strip().lower()), None)
 
 
+def _norm_sector(v):
+    """Accept a sectors.sector_id or sector_name; return canonical sector_id or None."""
+    if not v or not str(v).strip():
+        return None
+    c = get_db()
+    try:
+        r = c.execute("SELECT sector_id FROM sectors WHERE sector_id=? OR sector_name=?",
+                      (str(v).strip(), str(v).strip())).fetchone()
+        return r["sector_id"] if r else None
+    finally:
+        c.close()
+
+
 def validate_profile(data, partial=False):
     """Return list of error strings; empty means valid."""
     errs = []
     if not partial or "status" in data:
         if not _norm_status(data.get("status")):
             errs.append(f"status must be one of: {', '.join(STATUS_OPTIONS)}")
+    # full name: required on create, optional on partial update
+    if not partial or "full_name" in data:
+        name = (data.get("full_name") or "").strip()
+        if not partial and not name:
+            errs.append("full_name is required")
+        elif "full_name" in data and data.get("full_name") is not None:
+            if not (2 <= len(name) <= 100):
+                errs.append("full_name must be 2-100 characters")
+    # free-text profile fields: length caps only
+    for field, mx in [("current_field", 120), ("city", 80), ("town_village", 80),
+                      ("institution_name", 120), ("qualification", 120),
+                      ("course_program", 120), ("specialization", 120),
+                      ("year_semester", 40), ("location_text", 200)]:
+        if field in data and data[field] is not None and len(str(data[field])) > mx:
+            errs.append(f"{field} must be at most {mx} characters")
+    if "education_level" in data and data["education_level"]:
+        if data["education_level"] not in EDU_LEVELS:
+            errs.append(f"education_level must be one of: {', '.join(EDU_LEVELS)}")
+    if "target_sectors" in data and data["target_sectors"] is not None:
+        if not isinstance(data["target_sectors"], list):
+            errs.append("target_sectors must be a list of sector_id")
+        else:
+            for sid in data["target_sectors"]:
+                if not _norm_sector(sid):
+                    errs.append(f"unknown sector: {sid}")
     if "state_id" in data and data["state_id"]:
         c = get_db()
         try:
@@ -151,6 +189,8 @@ def _profile_row(pid):
             "FROM student_profile_skills sps LEFT JOIN skills s ON s.id=sps.skill_id WHERE sps.profile_id=? ORDER BY s.skill_name", (pid,)).fetchall()]
         base["interests"] = [r["interest"] for r in c.execute("SELECT interest FROM student_profile_interests WHERE profile_id=? ORDER BY interest", (pid,)).fetchall()]
         base["preferences"] = [r["preference"] for r in c.execute("SELECT preference FROM student_profile_preferences WHERE profile_id=? ORDER BY preference", (pid,)).fetchall()]
+        base["target_sectors"] = [dict(r) for r in c.execute(
+            "SELECT s.sector_id, s.sector_name FROM student_profile_target_sectors t JOIN sectors s ON s.sector_id=t.sector_id WHERE t.profile_id=? ORDER BY s.sector_name", (pid,)).fetchall()]
         # enrich location names
         if base.get("state_id"):
             r = c.execute("SELECT state_name FROM states WHERE state_id=?", (base["state_id"],)).fetchone()
@@ -187,15 +227,19 @@ def create_profile(data):
         c0.close()
     interests = sorted({_norm_interest(v) for v in (data.get("interests") or []) if _norm_interest(v)})
     prefs = sorted({_norm_pref(v) for v in (data.get("preferences") or []) if _norm_pref(v)})
+    target_sectors = sorted({_norm_sector(s) for s in (data.get("target_sectors") or []) if _norm_sector(s)})
 
     conn = get_db()
     try:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO student_profiles (status, state_id, district_id, location_text, education_level, course_program, specialization, year_semester, qualification, nsqf_level, goal) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (_norm_status(data.get("status")), data.get("state_id"), data.get("district_id"), data.get("location_text"),
-             data.get("education_level"), data.get("course_program"), data.get("specialization"),
-             data.get("year_semester"), data.get("qualification"), data.get("nsqf_level"), _norm_goal(data.get("goal"))),
+            "INSERT INTO student_profiles (status, full_name, state_id, district_id, location_text, city, town_village, education_level, institution_name, course_program, specialization, year_semester, qualification, nsqf_level, current_field, goal) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (_norm_status(data.get("status")), (data.get("full_name") or "").strip(), data.get("state_id"), data.get("district_id"), data.get("location_text"),
+             (data.get("city") or "").strip() or None, (data.get("town_village") or "").strip() or None,
+             data.get("education_level"), (data.get("institution_name") or "").strip() or None,
+             data.get("course_program"), data.get("specialization"),
+             data.get("year_semester"), data.get("qualification"), data.get("nsqf_level"),
+             (data.get("current_field") or "").strip() or None, _norm_goal(data.get("goal"))),
         )
         pid = cur.lastrowid
         for sid, lab, rank in norm_skills:
@@ -205,6 +249,8 @@ def create_profile(data):
             cur.execute("INSERT INTO student_profile_interests (profile_id, interest) VALUES (?,?)", (pid, it))
         for pr in prefs:
             cur.execute("INSERT INTO student_profile_preferences (profile_id, preference) VALUES (?,?)", (pid, pr))
+        for ts in target_sectors:
+            cur.execute("INSERT INTO student_profile_target_sectors (profile_id, sector_id) VALUES (?,?)", (pid, ts))
         conn.commit()
         return pid
     finally:
@@ -223,13 +269,18 @@ def update_profile(pid, data):
     finally:
         cur.close()
     # build SET clause for scalar fields
-    scalar = {k: data[k] for k in ("status", "state_id", "district_id", "location_text", "education_level",
-                                   "course_program", "specialization", "year_semester", "qualification", "nsqf_level", "goal")
+    scalar = {k: data[k] for k in ("status", "full_name", "state_id", "district_id", "location_text", "city",
+                                   "town_village", "education_level", "institution_name", "course_program",
+                                   "specialization", "year_semester", "qualification", "nsqf_level",
+                                   "current_field", "goal")
               if k in data}
     if "status" in scalar:
         scalar["status"] = _norm_status(scalar["status"])
     if "goal" in scalar:
         scalar["goal"] = _norm_goal(scalar["goal"])
+    for k in ("full_name", "city", "town_village", "institution_name", "current_field"):
+        if k in scalar and scalar[k] is not None:
+            scalar[k] = str(scalar[k]).strip() or None
     if scalar:
         scalar["updated_at"] = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
         sets = ", ".join(f"{k}=?" for k in scalar)
@@ -267,11 +318,9 @@ def update_profile(pid, data):
             conn.commit()
         finally:
             conn.close()
-    for field, table, norm in [("interests", "student_profile_interests", _norm_interest),
-                               ("preferences", "student_profile_preferences", _norm_pref)]:
+    for field, table, col, norm in [("interests", "student_profile_interests", "interest", _norm_interest),
+                                   ("preferences", "student_profile_preferences", "preference", _norm_pref)]:
         if field in data:
-            vals = sorted({_norm_pref(v) if field == "preferences" else _norm_interest(v)
-                           for v in (data[field] or []) if (norm(v))})
             # actually use correct norm
             if field == "interests":
                 vals = sorted({_norm_interest(v) for v in (data[field] or []) if _norm_interest(v)})
@@ -281,17 +330,27 @@ def update_profile(pid, data):
             try:
                 conn.execute(f"DELETE FROM {table} WHERE profile_id=?", (pid,))
                 for v in vals:
-                    conn.execute(f"INSERT INTO {table} (profile_id, {field[:-1]}) VALUES (?,?)", (pid, v))
+                    conn.execute(f"INSERT INTO {table} (profile_id, {col}) VALUES (?,?)", (pid, v))
                 conn.commit()
             finally:
                 conn.close()
+    if "target_sectors" in data:
+        vals = sorted({_norm_sector(s) for s in (data["target_sectors"] or []) if _norm_sector(s)})
+        conn = get_db()
+        try:
+            conn.execute("DELETE FROM student_profile_target_sectors WHERE profile_id=?", (pid,))
+            for v in vals:
+                conn.execute("INSERT INTO student_profile_target_sectors (profile_id, sector_id) VALUES (?,?)", (pid, v))
+            conn.commit()
+        finally:
+            conn.close()
     return _profile_row(pid)
 
 
 def list_profiles(limit=50):
     c = get_db()
     try:
-        return [dict(r) for r in c.execute("SELECT id, status, district_id, goal, created_at FROM student_profiles ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
+        return [dict(r) for r in c.execute("SELECT id, full_name, status, district_id, city, goal, created_at FROM student_profiles ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
     finally:
         c.close()
 
@@ -324,6 +383,9 @@ def analyze_profile(pid):
     allowed_sectors = set()
     for it in interests:
         allowed_sectors.update(INTEREST_SECTOR_MAP.get(it, []))
+    # explicit job-sector choices narrow/broaden alignment directly
+    target_sectors = {t.get("sector_name") for t in (prof.get("target_sectors") or []) if t.get("sector_name")}
+    allowed_sectors.update(target_sectors)
 
     c = get_db()
     try:
@@ -477,7 +539,7 @@ def analyze_profile(pid):
         "next_actions": next_actions[:5],
         "methodology": {
             "skill_normalization": "Alias/slug match via skill_aliases + case-insensitive name fallback; unresolved left unmapped.",
-            "match_score": "0.6*skill_coverage + interest(10) + education(10) + preference(1.5) capped 0-100; labels Strong/Potential/Limited Evidence.",
+            "match_score": "0.6*skill_coverage + interest/sector(10) + education(10) + preference(1.5) capped 0-100; sector alignment uses interest-mapped sectors plus the student's explicit job-sector choices; labels Strong/Potential/Limited Evidence.",
             "gap_priority": "Missing-skill frequency across top matches weighted by importance (High 3) + course availability (+1).",
             "data_source": "REAL",
         },

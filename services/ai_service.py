@@ -103,7 +103,7 @@ def build_context(student_id=None, entity=None, entity_id=None):
             an = get_student_analysis(int(student_id))
             if an:
                 ctx["student"] = {
-                    "profile": {k: an["profile"].get(k) for k in ("id", "status", "district_name", "state_name", "goal", "skills", "interests", "preferences", "education_level")},
+                    "profile": {k: an["profile"].get(k) for k in ("id", "full_name", "status", "district_name", "state_name", "city", "town_village", "goal", "skills", "interests", "preferences", "education_level", "institution_name", "qualification", "current_field", "target_sectors")},
                     "top_matches": [{"occupation": m["occupation_name"], "occupation_id": m["occupation_id"], "score": m["score"], "label": m["label"], "coverage": m["coverage"]} for m in an.get("career_matches", [])[:3]],
                     "prioritized_gaps": an.get("prioritized_gaps", [])[:3],
                     "next_actions": an.get("next_actions", [])[:3],
@@ -225,7 +225,8 @@ def fallback_answer(question, ctx):
             if not gaps:
                 return ("You have no prioritized gaps for your top matches — your current skills cover the required explicit NOS links.", _ev(["student_analysis"]))
             g = gaps[0]
-            return (f"Top gap for you is {g['skill_name']} ({g['skill_id']}). " + (f"Next action: {nxt[0]['action']} — {nxt[0]['reason']}" if nxt else ""),
+            who = f"{prof.get('full_name')}, " if prof.get("full_name") else ""
+            return (f"{who}top gap for you is {g['skill_name']} ({g['skill_id']}). " + (f"Next action: {nxt[0]['action']} — {nxt[0]['reason']}" if nxt else ""),
                     _ev(["student_analysis", "occupation_skills"]))
         if "why was this career" in q or "why was this occupation" in q:
             if matches:
@@ -241,7 +242,9 @@ def fallback_answer(question, ctx):
             vac_total = vacancy.get("total", 0)
             if vac_total:
                 match_txt += f". {vac_total} real LinkedIn postings exist in the dataset"
-        return (f"Profile #{prof.get('id')} — {prof.get('status')} in {prof.get('district_name') or '—'}. "
+        return (f"Profile #{prof.get('id')} — {prof.get('full_name') or 'unnamed'} ({prof.get('status')})"
+                f"{' in ' + prof['city'] if prof.get('city') else ''}"
+                f"{', targeting ' + ', '.join(t.get('sector_name') for t in (prof.get('target_sectors') or [])[:2]) if prof.get('target_sectors') else ''}. "
                 f"Top match: {match_txt}. "
                 f"Gaps: {', '.join(g['skill_name'] for g in gaps[:2]) or 'none'}.",
                 _ev(["student_analysis"]))
@@ -395,11 +398,13 @@ SYSTEM_PROMPT = (
     "MODE 2 — general questions unrelated to Kaushora data (e.g. capitals, science, "
     "history, how-to explainers): answer normally from your own knowledge, and start your "
     "answer with exactly this marker on its own line: [General knowledge]. "
+    "When a STUDENT block is present, tailor dataset answers to that profile: use their "
+    "name, top career matches, prioritized gaps and next actions. "
     "Be concise. "
     "FORMAT — shape every answer identically: line 1 = the direct answer in one sentence. "
     "Then 2-4 bullet lines, each starting with '• ' and under 20 words. "
-    "Then a final line starting with 'Source: ' stating the origin (Kaushora records, or "
-    "general knowledge). Plain text only — no markdown tables, no extra headings."
+    "Stop after the last bullet — no source line, no headings, no sign-off. "
+    "Plain text only — no markdown tables."
 )
 
 # Dataset-topic keywords: used only to decide whether the deterministic fallback
@@ -454,7 +459,12 @@ def ask_ai(question, context=None, student_id=None, entity=None, entity_id=None)
             "indicators": ctx.get("indicators"), "evidence": ctx.get("evidence"),
             "recommendations": ctx.get("recommendations"),
             "skills": ctx.get("skills"), "trends": ctx.get("trends")}
-    prompt = SYSTEM_PROMPT + "\nCONTEXT (Kaushora database extracts):\n" + json.dumps(slim)[:5000] + "\nQUESTION:\n" + (question or "")
+    # Student block goes FIRST so truncation never cuts the profile the answer
+    # must be personalized with.
+    student_txt = json.dumps(ctx.get("student"))[:2500] if ctx.get("student") else "none"
+    prompt = (SYSTEM_PROMPT + "\nSTUDENT (profile + top matches + gaps + next actions):\n" + student_txt +
+              "\nCONTEXT (Kaushora database extracts):\n" + json.dumps(slim)[:4000] +
+              "\nQUESTION:\n" + (question or ""))
     model = os.environ.get("OLLAMA_MODEL", "gemma4:31b")
     try:
         url = "https://ollama.com/api/chat"

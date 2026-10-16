@@ -501,15 +501,20 @@ CREATE TABLE IF NOT EXISTS student_profiles (
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   status TEXT NOT NULL,
+  full_name TEXT,
   state_id TEXT,
   district_id TEXT,
   location_text TEXT,
+  city TEXT,
+  town_village TEXT,
   education_level TEXT,
+  institution_name TEXT,
   course_program TEXT,
   specialization TEXT,
   year_semester TEXT,
   qualification TEXT,
   nsqf_level TEXT,
+  current_field TEXT,
   goal TEXT,
   FOREIGN KEY (state_id) REFERENCES states(state_id),
   FOREIGN KEY (district_id) REFERENCES districts(district_id)
@@ -539,6 +544,15 @@ CREATE TABLE IF NOT EXISTS student_profile_preferences (
   preference TEXT NOT NULL,
   PRIMARY KEY (profile_id, preference),
   FOREIGN KEY (profile_id) REFERENCES student_profiles(id) ON DELETE CASCADE
+);
+
+-- Sectors the student wants a job in (validated against sectors.sector_id).
+CREATE TABLE IF NOT EXISTS student_profile_target_sectors (
+  profile_id INTEGER NOT NULL,
+  sector_id TEXT NOT NULL,
+  PRIMARY KEY (profile_id, sector_id),
+  FOREIGN KEY (profile_id) REFERENCES student_profiles(id) ON DELETE CASCADE,
+  FOREIGN KEY (sector_id) REFERENCES sectors(sector_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_curriculum_course ON curriculum(course_id);

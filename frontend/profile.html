@@ -37,8 +37,8 @@
   (function(){
     "use strict";
     const page=document.getElementById("page");
-    let step=0, data={ status:"", state_id:"", district_id:"", location_text:"", education_level:"", course_program:"", specialization:"", year_semester:"", qualification:"", nsqf_level:"", skills:[], interests:[], preferences:[], goal:"" };
-    let states=[], districts=[], allSkills=[], skillDemand={};
+    let step=0, data={ status:"", full_name:"", state_id:"", district_id:"", location_text:"", city:"", town_village:"", education_level:"", institution_name:"", course_program:"", specialization:"", year_semester:"", qualification:"", nsqf_level:"", current_field:"", skills:[], interests:[], target_sectors:[], preferences:[], goal:"" };
+    let states=[], districts=[], allSkills=[], skillDemand={}, sectors=[];
     const STATUS_OPTS=[
       {id:"School Student", label:"School Student", desc:"Class 8-12"},
       {id:"College Student", label:"College Student", desc:"Undergraduate / Postgraduate"},
@@ -51,7 +51,8 @@
     const PREFS=["Earning Potential","Career Growth","Opportunities Near Me","Technical Work","Working With People","Employment Stability","Emerging Industries","Further Education","Entrepreneurship"];
     const GOALS=["Choose a Career","Get My First Job","Improve My Skills","Find Better Career Options","Prepare for Emerging Field","Find Relevant Training","Understand My Skill Gaps"];
     const PROF_LABELS=["Just Started","Comfortable","Can Apply","Highly Comfortable"];
-    const TOTAL=8; // 0-7
+    const TOTAL=10; // 0-9
+    const STEP_NAMES=["About You","Education","Work","Skills","Interests","Job Sectors","Preferences","Goal","Review","Analysis"];
 
     const editId=new URLSearchParams(location.search).get("id");
     async function init(){
@@ -59,6 +60,7 @@
         states=await window.KaushoraAPI.get("/api/meta/states");
         districts=await window.KaushoraAPI.get("/api/meta/districts");
         allSkills=await window.KaushoraAPI.get("/api/meta/skills");
+        try{ sectors=await window.KaushoraAPI.get("/api/sectors"); }catch(e){ sectors=[]; }
         try{
           const fullSkills=await window.KaushoraAPI.get("/api/skills");
           fullSkills.forEach(function(s){ skillDemand[s.id]={ demand_status:s.demand_status, demand_count:s.demand_count||0 }; });
@@ -68,18 +70,25 @@
         try{
           const p=await window.KaushoraAPI.get("/api/student/profile/"+editId);
           Object.assign(data, {
-            status:p.status||"", state_id:p.state_id||"", district_id:p.district_id||"",
-            location_text:p.location_text||"", education_level:p.education_level||"",
+            status:p.status||"", full_name:p.full_name||"", state_id:p.state_id||"", district_id:p.district_id||"",
+            location_text:p.location_text||"", city:p.city||"", town_village:p.town_village||"",
+            education_level:p.education_level||"", institution_name:p.institution_name||"",
             course_program:p.course_program||"", specialization:p.specialization||"",
             year_semester:p.year_semester||"", qualification:p.qualification||"",
-            nsqf_level:p.nsqf_level||"", skills:(p.skills||[]).map(s=>({skill_id:s.skill_id, proficiency_label:s.proficiency_label||"Comfortable"})),
-            interests:p.interests||[], preferences:p.preferences||[], goal:p.goal||""
+            nsqf_level:p.nsqf_level||"", current_field:p.current_field||"",
+            skills:(p.skills||[]).map(s=>({skill_id:s.skill_id, proficiency_label:s.proficiency_label||"Comfortable"})),
+            interests:p.interests||[], target_sectors:(p.target_sectors||[]).map(t=>t.sector_name||t.sector_id||t),
+            preferences:p.preferences||[], goal:p.goal||""
           });
           document.title="Edit Profile #"+editId+" — Kaushora";
         }catch(e){ /* ignore, keep draft */ }
       } else {
-        // try restore draft
+        // try restore draft (normalize for drafts saved by older wizard versions)
         try{ const d=JSON.parse(localStorage.getItem("kaushora_profile_draft")||"null"); if(d) Object.assign(data,d); }catch(e){}
+        if(!Array.isArray(data.skills)) data.skills=[];
+        if(!Array.isArray(data.interests)) data.interests=[];
+        if(!Array.isArray(data.target_sectors)) data.target_sectors=[];
+        if(!Array.isArray(data.preferences)) data.preferences=[];
       }
       render();
     }
@@ -89,7 +98,7 @@
     function progress(){
       let h='<div class="progress" aria-label="Progress">';
       for(let i=0;i<TOTAL;i++) h+='<i class="'+(i<step?'done':i===step?'on':'')+'" title="Step '+(i+1)+'"></i>';
-      return h+'</div><div style="font-size:12.5px;color:var(--muted);text-align:center">Step '+(step+1)+' of '+TOTAL+' — '+["About You","Education","Skills","Interests","Preferences","Goal","Review","Analysis"][step]+'</div>';
+      return h+'</div><div style="font-size:12.5px;color:var(--muted);text-align:center">Step '+(step+1)+' of '+TOTAL+' — '+STEP_NAMES[step]+'</div>';
     }
 
     function render(){
@@ -98,12 +107,14 @@
       h+='<div class="wizard"><div class="step-card">';
       if(step===0) h+=renderAbout();
       else if(step===1) h+=renderEducation();
-      else if(step===2) h+=renderSkills();
-      else if(step===3) h+=renderInterests();
-      else if(step===4) h+=renderPrefs();
-      else if(step===5) h+=renderGoal();
-      else if(step===6) h+=renderReview();
-      else if(step===7) h+=renderDone();
+      else if(step===2) h+=renderWork();
+      else if(step===3) h+=renderSkills();
+      else if(step===4) h+=renderInterests();
+      else if(step===5) h+=renderSectors();
+      else if(step===6) h+=renderPrefs();
+      else if(step===7) h+=renderGoal();
+      else if(step===8) h+=renderReview();
+      else if(step===9) h+=renderDone();
       h+='</div></div>';
       page.innerHTML=h;
       bind();
@@ -129,6 +140,11 @@
       document.querySelectorAll(".choice[data-goal]").forEach(el=>el.addEventListener("click",()=>{
         data.goal=el.dataset.goal; document.querySelectorAll(".choice[data-goal]").forEach(c=>c.classList.remove("sel")); el.classList.add("sel");
       }));
+      document.querySelectorAll(".choice[data-sector]").forEach(el=>el.addEventListener("click",()=>{
+        const v=el.dataset.sector; const i=data.target_sectors.indexOf(v);
+        if(i>=0) data.target_sectors.splice(i,1); else data.target_sectors.push(v);
+        el.classList.toggle("sel");
+      }));
       // skill search
       const inp=document.getElementById("skillSearch");
       if(inp){
@@ -151,7 +167,7 @@
       // nav
       const back=document.getElementById("back"), next=document.getElementById("next");
       if(back) back.addEventListener("click",()=>{ if(step>0){ step--; render(); } });
-      if(next) next.addEventListener("click",()=>{ if(validate()){ step++; render(); if(step===7) submit(); } });
+      if(next) next.addEventListener("click",()=>{ if(validate()){ step++; render(); if(step===9) submit(); } });
       // selects
       const ssel=document.getElementById("stateSel");
       if(ssel) ssel.addEventListener("change",e=>{
@@ -164,8 +180,8 @@
       });
       const dsel=document.getElementById("districtSel");
       if(dsel) dsel.addEventListener("change",e=>data.district_id=e.target.value);
-      // education
-      ["education_level","course_program","specialization","year_semester","nsqf_level"].forEach(id=>{
+      // education + free-text fields
+      ["full_name","city","town_village","education_level","institution_name","course_program","specialization","year_semester","qualification","nsqf_level","current_field"].forEach(id=>{
         const el=document.getElementById(id);
         if(el) el.addEventListener("change",e=>data[e.target.id]=e.target.value);
         if(el) el.addEventListener("input",e=>data[e.target.id]=e.target.value);
@@ -194,28 +210,47 @@
       const err=document.getElementById("err");
       let msg="";
       if(step===0 && !data.status) msg="Please select your current status.";
-      if(step===2 && data.skills.length===0) msg="Add at least one skill to continue — you can edit later.";
+      if(step===0 && !(data.full_name||"").trim()) msg="Please enter your name.";
+      if(step===3 && data.skills.length===0) msg="Add at least one skill to continue — you can edit later.";
       if(msg){ if(err) err.textContent=msg; return false; }
       return true;
     }
 
     function renderAbout(){
-      return '<h2 style="margin:0 0 4px">About You</h2><p class="helper">Who are you right now? Pick the closest.</p>'+
+      return '<h2 style="margin:0 0 4px">About You</h2><p class="helper">Who are you, and where do you live?</p>'+
+        '<div class="field"><label>Your name</label><input id="full_name" value="'+esc(data.full_name)+'" placeholder="e.g. Priya Sharma" autocomplete="name" /></div>'+
         '<div class="choice-grid" style="margin-top:16px">'+STATUS_OPTS.map(o=>'<button class="choice '+(data.status===o.id?'sel':'')+'" data-status="'+esc(o.id)+'"><b>'+esc(o.label)+'</b><span>'+esc(o.desc)+'</span></button>').join("")+'</div>'+
         '<div style="margin-top:18px" class="grid cols-2"><div class="field"><label>State</label><select id="stateSel" class="inline-filter" style="width:100%;padding:10px"><option value="">Select state</option>'+states.map(s=>'<option value="'+s.state_id+'" '+(data.state_id===s.state_id?'selected':'')+'>'+esc(s.state_name)+'</option>').join("")+'</select></div>'+
         '<div class="field"><label>District</label><select id="districtSel" class="inline-filter" style="width:100%;padding:10px"><option value="">Select district</option>'+(states.length?districts.filter(d=>!data.state_id||d.state_id===data.state_id).map(d=>'<option value="'+d.district_id+'" '+(data.district_id===d.district_id?'selected':'')+'>'+esc(d.district_name)+'</option>').join(""):'')+'</select></div></div>'+
+        '<div class="grid cols-2"><div class="field"><label>City</label><input id="city" value="'+esc(data.city)+'" placeholder="e.g. Nagpur" /></div>'+
+        '<div class="field"><label>Town / Village</label><input id="town_village" value="'+esc(data.town_village)+'" placeholder="e.g. Hingna (optional)" /></div></div>'+
         '<div id="err" style="color:#b42318;font-size:13px;margin-top:8px"></div>'+
         '<div class="nav-row"><button class="btn ghost" disabled>Back</button><button id="next" class="btn">Continue →</button></div>';
     }
     function renderEducation(){
       const showCourse = ["College Student","ITI/Vocational Student","Working"].includes(data.status);
       const showYear = ["College Student","ITI/Vocational Student"].includes(data.status);
-      return '<h2 style="margin:0 0 4px">Education</h2><p class="helper">Only what applies to you — skip the rest.</p>'+
+      return '<h2 style="margin:0 0 4px">Education</h2><p class="helper">Your qualifications — only what applies, skip the rest.</p>'+
         '<div class="field"><label>Education level</label><select id="education_level" class="inline-filter" style="width:100%;padding:10px"><option value="">Select</option>'+["10th","12th","Diploma","ITI","Graduate","Post Graduate","Other"].map(v=>'<option '+(data.education_level===v?'selected':'')+'>'+v+'</option>').join("")+'</select></div>'+
+        '<div class="field"><label>Qualification</label><input id="qualification" value="'+esc(data.qualification)+'" placeholder="e.g. B.Com, Electrician Trade, HSC" /></div>'+
+        '<div class="field"><label>Institution / College / School name</label><input id="institution_name" value="'+esc(data.institution_name)+'" placeholder="e.g. Government ITI Nagpur" /></div>'+
         (showCourse?'<div class="field"><label>Course / Program</label><input id="course_program" value="'+esc(data.course_program)+'" placeholder="e.g. B.Com, Fitter, B.Tech" /></div>':'')+
         '<div class="field"><label>Specialization (optional)</label><input id="specialization" value="'+esc(data.specialization)+'" placeholder="e.g. Computer Science, Electrical" /></div>'+
         (showYear?'<div class="field"><label>Year / Semester</label><input id="year_semester" value="'+esc(data.year_semester)+'" placeholder="e.g. 2nd Year" /></div>':'')+
         '<div class="field"><label>NSQF level (if known)</label><select id="nsqf_level" class="inline-filter" style="width:100%;padding:10px"><option value="">Unknown</option><option '+(data.nsqf_level==="3"?'selected':'')+'>3</option><option '+(data.nsqf_level==="3.5"?'selected':'')+'>3.5</option><option '+(data.nsqf_level==="4"?'selected':'')+'>4</option></select></div>'+
+        '<div class="nav-row"><button id="back" class="btn ghost">← Back</button><button id="next" class="btn">Continue →</button></div>';
+    }
+    function renderWork(){
+      return '<h2 style="margin:0 0 4px">Your Field of Work</h2><p class="helper">What field do you currently work in? Leave blank if you are a student or not working yet.</p>'+
+        '<div class="field"><label>Current field of work</label><input id="current_field" value="'+esc(data.current_field)+'" placeholder="e.g. Retail sales, Farming, Electrical repair" /></div>'+
+        '<div class="nav-row"><button id="back" class="btn ghost">← Back</button><button id="next" class="btn">Continue →</button></div>';
+    }
+    function renderSectors(){
+      const body = sectors.length
+        ? '<div class="choice-grid">'+sectors.map(s=>'<button class="choice '+(data.target_sectors.includes(s.sector_id)?'sel':'')+'" data-sector="'+esc(s.sector_id)+'"><b>'+esc(s.sector_name)+'</b></button>').join("")+'</div>'
+        : '<p class="helper">Sector list could not be loaded — you can add this later by editing your profile.</p>';
+      return '<h2 style="margin:0 0 4px">Where do you want a job?</h2><p class="helper">Pick the sectors you want to work in — Kaushora matches careers against these.</p>'+
+        body+
         '<div class="nav-row"><button id="back" class="btn ghost">← Back</button><button id="next" class="btn">Continue →</button></div>';
     }
     function renderSkills(){
@@ -244,13 +279,16 @@
     }
     function renderReview(){
       const chips = arr=>arr.length?arr.map(v=>'<span class="pill tag-green">'+esc(v)+'</span>').join(" "):'<span style="color:var(--muted)">None</span>';
+      const secNames = data.target_sectors.map(id=>{ const s=sectors.find(x=>x.sector_id===id); return s?s.sector_name:id; });
       return '<h2 style="margin:0 0 4px">Review</h2><p class="helper">Check everything — tap Edit to jump back.</p>'+
-        '<div class="card" style="margin-top:12px"><b>About</b> — '+esc(data.status||"—")+' · '+esc((states.find(s=>s.state_id===data.state_id)||{}).state_name||"")+' / '+esc((districts.find(d=>d.district_id===data.district_id)||{}).district_name||"")+' <a href="#" onclick="step=0;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
-        '<div class="card"><b>Education</b> — '+esc(data.education_level||"—")+' · '+esc(data.course_program||"")+' <a href="#" onclick="step=1;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
-        '<div class="card"><b>Skills</b> — '+data.skills.map(s=>esc(s.skill_id)+' ('+esc(s.proficiency_label)+')').join(", ")+'<a href="#" onclick="step=2;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
-        '<div class="card"><b>Interests</b> — '+chips(data.interests)+' <a href="#" onclick="step=3;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
-        '<div class="card"><b>Preferences</b> — '+chips(data.preferences)+' <a href="#" onclick="step=4;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
-        '<div class="card"><b>Goal</b> — '+esc(data.goal||"—")+' <a href="#" onclick="step=5;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
+        '<div class="card" style="margin-top:12px"><b>About</b> — '+esc(data.full_name||"—")+' · '+esc(data.status||"—")+' · '+esc(data.city||"")+esc(data.town_village?", "+data.town_village:"")+' · '+esc((states.find(s=>s.state_id===data.state_id)||{}).state_name||"")+' / '+esc((districts.find(d=>d.district_id===data.district_id)||{}).district_name||"")+' <a href="#" onclick="step=0;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
+        '<div class="card"><b>Education</b> — '+esc(data.education_level||"—")+' · '+esc(data.qualification||"")+' · '+esc(data.institution_name||"")+' <a href="#" onclick="step=1;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
+        '<div class="card"><b>Field of work</b> — '+esc(data.current_field||"—")+' <a href="#" onclick="step=2;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
+        '<div class="card"><b>Skills</b> — '+data.skills.map(s=>esc(s.skill_id)+' ('+esc(s.proficiency_label)+')').join(", ")+'<a href="#" onclick="step=3;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
+        '<div class="card"><b>Interests</b> — '+chips(data.interests)+' <a href="#" onclick="step=4;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
+        '<div class="card"><b>Job sectors</b> — '+chips(secNames)+' <a href="#" onclick="step=5;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
+        '<div class="card"><b>Preferences</b> — '+chips(data.preferences)+' <a href="#" onclick="step=6;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
+        '<div class="card"><b>Goal</b> — '+esc(data.goal||"—")+' <a href="#" onclick="step=7;render();return false" style="float:right;font-size:12px">Edit</a></div>'+
         '<div class="nav-row"><button id="back" class="btn ghost">← Back</button><button id="next" class="btn" style="background:var(--pistachio-deep)">Create profile →</button></div>';
     }
     function renderDone(){
@@ -273,7 +311,7 @@
         try{ localStorage.setItem("kaushora_last_profile", String(newId)); }catch(e){}
         location.href="student.html?id="+newId;
       }catch(e){
-        page.innerHTML='<div class="step-card"><h2>Could not save</h2><p style="color:#b42318">'+esc(e.message)+'</p><p class="helper">Check required fields and try again.</p><div class="nav-row"><button onclick="step=6;render()" class="btn ghost">← Back to review</button></div></div>';
+        page.innerHTML='<div class="step-card"><h2>Could not save</h2><p style="color:#b42318">'+esc(e.message)+'</p><p class="helper">Check required fields and try again.</p><div class="nav-row"><button onclick="step=8;render()" class="btn ghost">← Back to review</button></div></div>';
       }
     }
 

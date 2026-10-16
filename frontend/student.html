@@ -33,7 +33,7 @@
           const list=await window.KaushoraAPI.get("/api/student/profiles");
           const el=document.getElementById("list");
           if(!list.length) el.innerHTML=window.KShell.emptyState("No profiles yet","Create your first profile to see matches.");
-          else el.innerHTML='<div class="grid cols-2">'+list.map(p=>'<a class="card" href="student.html?id='+p.id+'" style="text-decoration:none;color:inherit"><b>#'+p.id+' '+esc(p.status||"")+'</b><br><span style="color:var(--muted);font-size:13px">'+esc(p.district_id||"")+' · '+esc(p.goal||"")+' · '+p.created_at.slice(0,10)+'</span></a>').join("")+'</div>';
+          else el.innerHTML='<div class="grid cols-2">'+list.map(p=>'<a class="card" href="student.html?id='+p.id+'" style="text-decoration:none;color:inherit"><b>#'+p.id+' '+esc(p.full_name||p.status||"")+'</b><br><span style="color:var(--muted);font-size:13px">'+esc(p.city||p.district_id||"")+' · '+esc(p.goal||"")+' · '+p.created_at.slice(0,10)+'</span></a>').join("")+'</div>';
         }catch(e){ document.getElementById("list").innerHTML=window.KShell.errorState(e.message); }
         return;
       }
@@ -50,9 +50,11 @@
     }
     function render(){
       const prof=profile;
-      document.title="Student #"+prof.id+" — Kaushora";
+      document.title=(prof.full_name?"Student "+prof.full_name+" — Kaushora":"Student #"+prof.id+" — Kaushora");
+      const place=[prof.city,prof.town_village,prof.district_name||prof.district_id,prof.state_name].filter(Boolean).join(", ");
+      const tsecs=(prof.target_sectors||[]).map(t=>t.sector_name).join(", ");
       let h='<a href="student.html" class="btn ghost sm">All profiles</a>';
-      h+='<div class="card" style="margin-top:14px"><div class="profile-header"><div class="avatar">'+esc((prof.status||"S")[0])+'</div><div><h2 style="margin:0">Profile #'+prof.id+' — '+esc(prof.status)+'</h2><p style="margin:2px 0;color:var(--muted);font-size:13px">'+esc(prof.district_name||prof.district_id||"")+' · '+esc(prof.state_name||"")+' · '+esc(prof.goal||"")+'</p></div><span class="pill tag-green">Source data</span></div>';
+      h+='<div class="card" style="margin-top:14px"><div class="profile-header"><div class="avatar">'+esc((prof.full_name||prof.status||"S")[0])+'</div><div><h2 style="margin:0">'+esc(prof.full_name||("Profile #"+prof.id))+' — '+esc(prof.status||"")+'</h2><p style="margin:2px 0;color:var(--muted);font-size:13px">'+esc(place||"")+(prof.institution_name?' · '+esc(prof.institution_name):"")+(prof.goal?' · '+esc(prof.goal):"")+'</p>'+(prof.current_field?'<p style="margin:2px 0;font-size:13px">Works in: <b>'+esc(prof.current_field)+'</b></p>':"")+(tsecs?'<p style="margin:2px 0;font-size:13px">Wants a job in: <b>'+esc(tsecs)+'</b></p>':"")+'</div><span class="pill tag-green">Source data</span></div>';
       h+='<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
       h+='<a class="btn ghost sm" href="profile.html?id='+prof.id+'">Edit Profile</a>';
       h+='<button class="btn ghost sm" onclick="if(confirm(\'Delete profile #'+prof.id+'?\'))fetch(\'/api/student/profile/'+prof.id+'\',{method:\'DELETE\'}).then(()=>location.href=\'student.html\')">Delete</button>';
@@ -95,7 +97,7 @@
       }
       h+='<h2 class="section">Next Actions</h2>';
       h+=analysis.next_actions.map((a,i)=>'<div class="next-action"><div class="num">'+(i+1)+'</div><div><b>'+esc(a.action)+'</b><br><span style="font-size:13px;color:var(--muted)">'+esc(a.reason)+'</span></div></div>').join("");
-      h+='<div class="card" style="margin-top:16px"><h3>Why am I seeing this?</h3><p style="font-size:13px;color:var(--muted)">Data used: your profile (status, skills with proficiency, interests, preferences, location, education) + '+(nScored+nUnscored)+' occupations with explicit NOS links + 15 ITI courses + labour indicators (state-level).<br>Method: '+esc(analysis.methodology.match_score)+'<br>Limitations: only '+nScored+' occupations scorable; district demand unpublished.</p><a class="btn ghost sm" href="ai.html">Ask Kaushora AI about your profile</a></div>';
+      h+='<div class="card" style="margin-top:16px"><h3>Why am I seeing this?</h3><p style="font-size:13px;color:var(--muted)">Data used: your profile (name, status, skills with proficiency, interests, job-sector choices, location incl. city/town, education + institution, current field) + '+(nScored+nUnscored)+' occupations with explicit NOS links + 15 ITI courses + labour indicators (state-level).<br>Method: '+esc(analysis.methodology.match_score)+'<br>Limitations: only '+nScored+' occupations scorable; district demand unpublished.</p><a class="btn ghost sm" href="ai.html">Ask Kaushora AI about your profile</a></div>';
       page.innerHTML=h;
     }
     function esc(s){ return window.KShell.escapeHtml(s); }
